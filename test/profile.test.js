@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { normalizeProfile, emptyProfile } from '../shared/model.js';
 import * as P from '../shared/profile.js';
 
-const seed = () => normalizeProfile(JSON.parse(readFileSync(new URL('../shared/seed-profile.json', import.meta.url))));
+const seed = () => normalizeProfile(JSON.parse(readFileSync(new URL('./fixtures/sample-profile.json', import.meta.url))));
+const realSeed = () => normalizeProfile(JSON.parse(readFileSync(new URL('../shared/seed-profile.json', import.meta.url))));
 const dish = { originalName: 'Mapo Doufu', translatedName: 'Mapo tofu', cuisine: 'Sichuan', ingredients: ['silken tofu', 'doubanjiang'], attributes: ['spicy', 'rich'] };
 
 test('seed loads as explicit, active preferences with evidence and history', () => {
@@ -17,6 +18,45 @@ test('seed loads as explicit, active preferences with evidence and history', () 
     assert.equal(x.history[0].action, 'created');
   }
   assert.equal(p.restrictions[0].type, 'allergy');
+});
+
+test('real seed: confirmed items are explicit, likely items are suggested but usable, guidance and settings load', () => {
+  const p = realSeed();
+  const fish = P.findPreference(p, { subject: 'fish', polarity: 'like' });
+  assert.equal(fish.origin, 'explicit');
+  const bream = P.findPreference(p, { subject: 'sea bream', polarity: 'like' });
+  assert.equal(bream.origin, 'inferred');
+  assert.equal(bream.status, 'suggested');
+  assert.ok(Math.abs(bream.confidence - 0.45) < 1e-9);
+  assert.ok(!P.isEmerging(bream));
+  assert.ok(P.isUnverifiedPrior(bream));
+  assert.equal(p.settings.defaultOccasion, 'ask');
+  assert.deepEqual(p.settings.glossLanguages, ['English', 'German']);
+  assert.equal(p.restrictions[0].severity, 'flexible');
+  assert.ok(p.guidance.length >= 10);
+  const view = P.profileForAI(p);
+  assert.equal(view.homeCity, 'Munich, Germany');
+  assert.ok(view.guidance.some((g) => /garlic/.test(g)));
+  assert.ok(view.preferences.some((x) => x.like === 'sea bream' && /not yet verified/.test(x.source)));
+});
+
+test('feedback on a likely seed item strengthens it but it stays unconfirmed', () => {
+  const p = realSeed();
+  const e = P.recordHistory(p, { action: 'ordered', dish: { originalName: 'Grilled fish', ingredients: ['sea bream'] } });
+  P.applyFeedback(p, e.id, ['order_again']);
+  const g = P.findPreference(p, { subject: 'grilled fish', polarity: 'like' });
+  assert.ok(g.confidence > 0.45);
+  assert.equal(g.status, 'suggested');
+  assert.ok(!P.isUnverifiedPrior(g));
+});
+
+test('guidance can be added, edited and removed', () => {
+  const p = emptyProfile();
+  P.addGuidance(p, 'Always offer a fish option');
+  P.updateGuidance(p, 0, 'Offer a fish option');
+  assert.deepEqual(p.guidance, ['Offer a fish option']);
+  P.removeGuidance(p, 0);
+  assert.deepEqual(p.guidance, []);
 });
 
 test('recording an order alone never changes preferences', () => {

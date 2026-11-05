@@ -12,6 +12,9 @@ export const ATTRIBUTES = [
 
 export const SOURCES = ['menu', 'typical'];
 
+/** Attributes describing how a dish is prepared or how heavy it is; shown as a style line. */
+export const STYLE_ATTRIBUTES = ['grilled', 'fried', 'raw', 'braised', 'creamy', 'rich', 'light', 'spicy', 'fermented', 'smoky'];
+
 const str = (v) => (v == null ? null : String(v).trim() || null);
 const arr = (v) => (Array.isArray(v) ? v : []);
 const strs = (v) => arr(v).map((x) => String(x).trim()).filter(Boolean);
@@ -27,6 +30,7 @@ export function normalizeDish(d, i) {
     section: str(d.section),
     originalName: str(d.originalName) ?? `Dish ${i + 1}`,
     translatedName: str(d.translatedName),
+    glosses: arr(d.glosses).filter((g) => str(g?.language) && str(g?.name)).map((g) => ({ language: str(g.language), name: str(g.name) })),
     menuDescription: str(d.menuDescription),
     price: {
       amount: Number.isFinite(Number(price.amount)) && price.amount !== null ? Number(price.amount) : null,
@@ -74,7 +78,7 @@ export function normalizeMenu(m) {
 /** Everything about a dish the matcher may search, lower-cased. */
 export function dishText(d) {
   return [
-    d.originalName, d.translatedName, d.menuDescription, d.explanation, d.cuisine, d.region,
+    d.originalName, d.translatedName, ...d.glosses.map((g) => g.name), d.menuDescription, d.explanation, d.cuisine, d.region,
     ...d.ingredients.map((x) => x.name), ...d.preparation.map((x) => x.method),
     ...d.flavours, ...d.textures, ...d.attributes,
   ].filter(Boolean).join(' · ').toLowerCase();

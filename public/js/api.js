@@ -16,7 +16,7 @@ export const api = {
   async status() {
     try { return await (await fetch('/api/status')).json(); } catch { return { available: false }; }
   },
-  extract: (source, translateTo) => post('/api/menu/extract', { source, translateTo }),
+  extract: (source, settings) => post('/api/menu/extract', { source, ...settings }),
   recommend: (payload) => post('/api/recommend', payload),
   parseProfile: (text) => post('/api/profile/parse', { text }),
 };

@@ -16,7 +16,9 @@ WasGibts reads menus through a personal taste profile. The profile belongs to th
 Profile
 ├─ schemaVersion, id, ownerId (null until accounts exist), createdAt, updatedAt
 ├─ about        { name, notes }
-├─ settings     { translateTo, shareRestrictionsWithAI, defaultOccasion }
+├─ settings     { translateTo, glossLanguages, homeCity, shareRestrictionsWithAI,
+│                defaultOccasion ('ask' | occasion), includeAdventurousPick }
+├─ guidance     string[]        ← standing ground rules in the user's words
 ├─ preferences  Preference[]   ← explicit, inferred and contextual preferences
 ├─ restrictions Restriction[]  ← allergies & hard rules
 └─ history      HistoryEntry[] ← food history
@@ -68,7 +70,7 @@ The dish snapshot keeps menu-verified ingredients where they exist, so later inf
 
 Rules (see `shared/profile.js`):
 
-- Inferred confidence is `min(0.7, 0.15 + 0.15 × Σweights)`.
+- Inferred confidence is `min(0.7, 0.15 + 0.15 × Σweights)`. The weights come from feedback, plus a *prior* when the user listed the item as "likely" in a starting profile or import (`source: seed | import` with a `weight`). Such an item is used, but it is labelled "listed as likely, not yet verified" until feedback arrives.
 - Anything under weight 1 is an *early signal*: stored, but not used and not sent to the AI.
 - Rating an entry again replaces its earlier evidence, so nothing is counted twice. Deleting an entry withdraws everything it taught.
 - Feedback that matches an explicit preference adds evidence to it and does not create a duplicate.
@@ -80,7 +82,8 @@ Rules (see `shared/profile.js`):
 Menu { restaurant {name, cuisine, menuLanguage, currency}, source {kind, label, url}, dishes: Dish[], notes[] }
 
 Dish {
-  id, section, originalName, translatedName, menuDescription (verbatim | null),
+  id, section, originalName, translatedName, glosses [{language, name}],
+  menuDescription (verbatim | null),
   price { amount | null, currency, display },      ← never estimated
   explanation, ingredients [{name, source}], preparation [{method, source}],
   flavours[], textures[], cuisine, region, culturalNote,
@@ -93,7 +96,7 @@ Dish {
 ## Recommendation
 
 ```
-{ engine: ai | local, headline, picks: Pick[3..5], cautions[], orderingTip }
+{ engine: ai | local, headline, picks: Pick[3..5], cautions[], orderingTip, occasionQuestion }
 Pick { dishId, role, whyYou, evidence [{type, ref, text}], concerns[], occasionFit }
 ```
 

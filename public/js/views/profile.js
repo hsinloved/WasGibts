@@ -1,7 +1,7 @@
 import { h, mount, toast, fmtDate, plural } from '../dom.js';
 import { api } from '../api.js';
 import { CATEGORIES, OCCASIONS, RESTRICTION_TYPES, confidenceLabel } from '/shared/model.js';
-import { exportProfile, isEmerging, feedbackScore } from '/shared/profile.js';
+import { exportProfile, isEmerging, evidenceScore, isUnverifiedPrior } from '/shared/profile.js';
 
 const ui = { editing: null, adding: null, importText: '', proposal: null, busy: false };
 
@@ -29,14 +29,15 @@ export function renderProfile(root, ctx) {
     section('You’d rather avoid', 'Taste, not safety — allergies go further down.', dislikes, ctx, rerender, { polarity: 'dislike' }),
 
     h('section.block', {},
-      h('h2.section-title', {}, 'Patterns I’ve noticed'),
-      h('p.muted', {}, 'Drawn only from your feedback on dishes you ordered. They count for less until you confirm them.'),
+      h('h2.section-title', {}, 'To be confirmed'),
+      h('p.muted', {}, 'Things you listed as likely, and patterns from your feedback on dishes you ordered. They count for less until you confirm them.'),
       suggested.length ? h('ul.prefs', {}, suggested.map((x) => prefRow(x, ctx, rerender))) : h('p.empty', {}, 'None yet. Give feedback in your journal and patterns will appear here.'),
       emerging.length > 0 && h('details.quiet', {},
         h('summary', {}, `Early signals (${emerging.length}) — too thin to use yet`),
         h('ul.prefs', {}, emerging.map((x) => prefRow(x, ctx, rerender)))),
     ),
 
+    guidanceBlock(ctx, rerender),
     restrictionsBlock(ctx, rerender),
     importBlock(ctx, rerender),
     settingsBlock(ctx, rerender),
@@ -73,7 +74,8 @@ function prefRow(pref, ctx, rerender) {
   }
   const origin = pref.origin === 'explicit'
     ? (pref.evidence.some((e) => e.source === 'user_confirmed') ? 'you confirmed' : 'you said')
-    : pref.status === 'active' ? 'you confirmed' : `noticed · ${confidenceLabel(pref.confidence)}`;
+    : pref.status === 'active' ? 'you confirmed'
+      : isUnverifiedPrior(pref) ? 'you listed as likely · not yet tested' : `noticed · ${confidenceLabel(pref.confidence)}`;
   const act = (op, label, cls = 'ghost') => h(`button.small.${cls}`, { type: 'button', onclick: async () => { await store.do(op, pref.id); rerender(); } }, label);
 
   return h('li.pref', {},
@@ -93,7 +95,7 @@ function prefRow(pref, ctx, rerender) {
     ),
     h('details.why', {},
       h('summary', {}, pref.origin === 'inferred' && pref.status === 'suggested'
-        ? `Why I think this · ${plural(pref.evidence.length, 'piece')} of evidence (weight ${feedbackScore(pref).toFixed(1)})`
+        ? `Why I think this · ${plural(pref.evidence.length, 'piece')} of evidence (weight ${evidenceScore(pref).toFixed(1)})`
         : 'Evidence and history'),
       h('ul.evidence-list', {}, pref.evidence.map((e) => h('li', {}, h('span.date', {}, fmtDate(e.at)), ' ', e.note))),
       h('ul.history-list', {}, pref.history.map((c) => h('li', {}, h('span.date', {}, fmtDate(c.at)), ` ${c.by === 'user' ? 'You' : 'WasGibts'}: ${c.action}${c.detail ? ` — ${c.detail}` : ''}`))),
@@ -125,6 +127,25 @@ function prefForm(initial, onSave, onCancel) {
 function select(options, value, onChange, labels = {}) {
   return h('select', { onchange: (e) => onChange(e.target.value) },
     options.map((o) => h('option', { value: o, selected: o === value }, labels[o] ?? o)));
+}
+
+// --- Ground rules (standing guidance) -------------------------------------------
+
+function guidanceBlock(ctx, rerender) {
+  const { store } = ctx;
+  let draft = '';
+  return h('section.block', {},
+    h('h2.section-title', {}, 'Ground rules'),
+    h('p.muted', {}, 'Standing instructions, in your words, sent with every recommendation request. Use them for what I should not assume and how you like recommendations made.'),
+    store.profile.guidance.length
+      ? h('ul.guidance-list', {}, store.profile.guidance.map((g, i) => h('li', {},
+        h('span', { contenteditable: 'plaintext-only', spellcheck: 'false', title: 'Click to edit', onblur: async (e) => { if (e.target.textContent.trim() !== g) { await store.do('updateGuidance', i, e.target.textContent); rerender(); } } }, g),
+        h('button.small.ghost.danger', { type: 'button', onclick: async () => { await store.do('removeGuidance', i); rerender(); } }, 'Remove'))))
+      : h('p.empty', {}, 'No ground rules yet.'),
+    h('form.inline', { onsubmit: async (e) => { e.preventDefault(); if (draft.trim()) { await store.do('addGuidance', draft); rerender(); } } },
+      h('label.field', {}, h('span', {}, 'Add a rule'), h('input', { maxlength: 200, placeholder: 'e.g. Don’t assume I want dessert', oninput: (e) => { draft = e.target.value; } })),
+      h('button.small', { type: 'submit' }, 'Add')),
+  );
 }
 
 // --- Restrictions --------------------------------------------------------------
@@ -237,11 +258,20 @@ function settingsBlock(ctx, rerender) {
   return h('section.block', {},
     h('h2.section-title', {}, 'Settings'),
     h('div.row', {},
-      h('label.field', {}, h('span', {}, 'Translate menus into'),
-        h('input', { value: s.translateTo, maxlength: 40, onchange: async (e) => { await store.setSettings({ translateTo: e.target.value.trim() || 'English' }); } })),
-      h('label.field', {}, h('span', {}, 'Usual occasion'),
-        select(Object.keys(OCCASIONS), s.defaultOccasion, async (v) => { await store.setSettings({ defaultOccasion: v }); }, Object.fromEntries(Object.entries(OCCASIONS).map(([k, o]) => [k, o.label])))),
+      h('label.field', {}, h('span', {}, 'Translate & explain in'),
+        h('input', { value: s.translateTo, maxlength: 60, onchange: async (e) => { await store.setSettings({ translateTo: e.target.value.trim() || 'English' }); } })),
+      h('label.field', {}, h('span', {}, 'Also show names in'),
+        h('input', { value: s.glossLanguages.join(', '), maxlength: 80, placeholder: 'e.g. English, German', onchange: async (e) => { await store.setSettings({ glossLanguages: e.target.value.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 4) }); } })),
     ),
+    h('div.row', {},
+      h('label.field', {}, h('span', {}, 'Home city'),
+        h('input', { value: s.homeCity, maxlength: 80, placeholder: 'e.g. Munich, Germany', onchange: async (e) => { await store.setSettings({ homeCity: e.target.value.trim() }); } })),
+      h('label.field', {}, h('span', {}, 'Occasion when opening a menu'),
+        select(['ask', ...Object.keys(OCCASIONS)], s.defaultOccasion, async (v) => { await store.setSettings({ defaultOccasion: v }); }, { ask: 'Ask me', ...Object.fromEntries(Object.entries(OCCASIONS).map(([k, o]) => [k, o.label])) })),
+    ),
+    h('label.toggle', {},
+      h('input', { type: 'checkbox', checked: s.includeAdventurousPick, onchange: async (e) => { await store.setSettings({ includeAdventurousPick: e.target.checked }); } }),
+      ' Always include one adventurous or regional pick'),
     h('label.field', {}, h('span', {}, 'About you as an eater ', h('em', {}, 'optional, sent with requests')),
       h('textarea', { rows: 2, maxlength: 500, value: store.profile.about.notes, onchange: async (e) => { await store.setAbout({ notes: e.target.value }); } })),
   );

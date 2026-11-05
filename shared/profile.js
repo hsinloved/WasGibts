@@ -120,6 +120,27 @@ export function removePreference(profile, id) {
   if (profile.preferences.length !== before) touch(profile);
 }
 
+// --- Standing guidance ----------------------------------------------------------
+
+export function addGuidance(profile, text) {
+  const t = String(text ?? '').trim();
+  if (!t) throw new Error('Guidance cannot be empty');
+  if (!profile.guidance.includes(t)) profile.guidance.push(t);
+  touch(profile);
+}
+
+export function updateGuidance(profile, index, text) {
+  const t = String(text ?? '').trim();
+  if (!t) return removeGuidance(profile, index);
+  profile.guidance[index] = t;
+  touch(profile);
+}
+
+export function removeGuidance(profile, index) {
+  profile.guidance.splice(index, 1);
+  touch(profile);
+}
+
 // --- Restrictions (allergies etc. — not taste) -------------------------------
 
 export function addRestriction(profile, fields) {
@@ -250,13 +271,27 @@ export function feedbackScore(pref) {
   return pref.evidence.filter((e) => e.source === 'feedback').reduce((s, e) => s + (e.weight ?? 1), 0);
 }
 
+/**
+ * Weight behind an unconfirmed preference: feedback, plus any prior the user
+ * gave when they listed it as "likely" in a starting profile or import.
+ */
+export function evidenceScore(pref) {
+  return pref.evidence
+    .filter((e) => e.source === 'feedback' || ((e.source === 'seed' || e.source === 'import') && e.weight != null))
+    .reduce((s, e) => s + (e.weight ?? 1), 0);
+}
+
+/** Listed by the user as likely, and not yet tested by any feedback. */
+export const isUnverifiedPrior = (pref) => pref.origin === 'inferred' && pref.status === 'suggested'
+  && pref.evidence.some((e) => e.source === 'seed' || e.source === 'import') && feedbackScore(pref) === 0;
+
 function rescore(pref, reason) {
   if (pref.origin !== 'inferred' || pref.status === 'active') {
     log(pref, 'evidence', reason, 'system');
     return;
   }
   const before = pref.confidence;
-  pref.confidence = Math.min(INFERRED_CAP, 0.15 + 0.15 * feedbackScore(pref));
+  pref.confidence = Math.min(INFERRED_CAP, 0.15 + 0.15 * evidenceScore(pref));
   if (confidenceLabel(before) !== confidenceLabel(pref.confidence)) {
     log(pref, 'confidence', `${confidenceLabel(before)} → ${confidenceLabel(pref.confidence)} (${reason})`, 'system');
   } else {
@@ -268,7 +303,7 @@ function rescore(pref, reason) {
  * An inferred preference is worth surfacing once it rests on more than one
  * light signal. Below this it is still stored, just not shown as a pattern.
  */
-export const isEmerging = (pref) => pref.origin === 'inferred' && feedbackScore(pref) < 1;
+export const isEmerging = (pref) => pref.origin === 'inferred' && pref.status !== 'active' && evidenceScore(pref) < 1;
 
 // --- Views --------------------------------------------------------------------
 
@@ -285,7 +320,10 @@ export function profileForAI(profile, { occasion } = {}) {
       id: p.id,
       [p.polarity]: p.subject,
       category: p.category,
-      source: p.origin === 'explicit' ? 'stated by user' : (p.status === 'active' ? 'confirmed pattern' : 'unconfirmed pattern from feedback'),
+      source: p.origin === 'explicit' ? 'stated by user'
+        : p.status === 'active' ? 'confirmed pattern'
+          : isUnverifiedPrior(p) ? 'likely, listed by user but not yet verified by feedback'
+            : 'unconfirmed pattern from feedback',
       confidence: confidenceLabel(p.confidence),
       ...(p.contexts.length ? { onlyFor: p.contexts } : {}),
       ...(p.note ? { note: p.note } : {}),
@@ -307,6 +345,8 @@ export function profileForAI(profile, { occasion } = {}) {
 
   return {
     about: profile.about.notes || undefined,
+    homeCity: profile.settings.homeCity || undefined,
+    guidance: profile.guidance.length ? profile.guidance : undefined,
     preferences: prefs,
     restrictions,
     restrictionsWithheld: !profile.settings.shareRestrictionsWithAI && profile.restrictions.length > 0,

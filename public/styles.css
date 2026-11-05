@@ -274,3 +274,13 @@ details.quiet { margin-top: 1rem; }
   .pref-actions { justify-content: start; }
   .tag { display: block; min-width: 0; margin-bottom: .1rem; }
 }
+
+/* --- Additions: glosses, style badges, occasion question ------------------------ */
+.glosses { display: block; font: .8rem/1.4 var(--sans); color: var(--muted); margin-top: .2rem; }
+.style { margin: 0 0 .6rem; display: flex; flex-wrap: wrap; gap: .35rem; }
+.badge { font: 600 .66rem/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); border: 1px solid var(--rule); padding: .3rem .5rem; border-radius: 2px; }
+.ask { max-width: var(--measure); margin: 0 0 1.5rem; padding: 1rem 1.25rem; background: var(--accent-soft); border-left: 2px solid var(--accent); }
+.ask p { margin: 0 0 .75rem; font-style: italic; }
+.ask .chip { background: var(--paper); }
+.guidance-list { list-style: none; padding: 0; margin: 0 0 1rem; }
+.guidance-list li { display: flex; gap: 1rem; justify-content: space-between; align-items: baseline; padding: .6rem 0; border-bottom: 1px solid var(--rule); font-size: 1rem; }

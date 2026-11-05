@@ -8,7 +8,8 @@ import * as P from '../shared/profile.js';
 
 const json = (f) => JSON.parse(readFileSync(new URL(`../shared/${f}`, import.meta.url)));
 const menu = normalizeMenu(json('sample-menu.json'));
-const seed = () => normalizeProfile(json('seed-profile.json'));
+const seed = () => normalizeProfile(JSON.parse(readFileSync(new URL('./fixtures/sample-profile.json', import.meta.url))));
+const realSeed = () => normalizeProfile(json('seed-profile.json'));
 
 test('sample menu normalises with unique ids and provenance', () => {
   assert.equal(menu.dishes.length, 9);
@@ -65,6 +66,40 @@ test('matches only on typical ingredients are hedged', () => {
   P.addPreference(p, { polarity: 'like', category: 'ingredient', subject: 'mushrooms' });
   const soup = recommendLocally(menu, p, {}).picks.find((x) => x.dishId === 'd9');
   assert.match(soup.whyYou, /menu doesn’t say/);
+});
+
+test('unknown occasion asks, and context-scoped preferences wait for an answer', () => {
+  const recs = recommendLocally(menu, seed(), {});
+  assert.ok(recs.occasionQuestion);
+  assert.ok(!recs.picks.some((p) => /vegetable-forward dishes/.test(p.whyYou)), 'lunch-only preference not applied');
+  assert.equal(recommendLocally(menu, seed(), { occasion: 'solo' }).occasionQuestion, null);
+});
+
+test('adventurous slot is filled when the profile asks for it', () => {
+  const p = realSeed();
+  const recs = recommendLocally(menu, p, { occasion: 'sharing' });
+  assert.equal(recs.picks.filter((x) => x.role === 'A little adventure').length, 1);
+  assert.ok(recs.picks.length <= 5);
+});
+
+test('real seed: fish matches fish dishes, hedges unverified likes, flags alcohol only when present', () => {
+  const p = realSeed();
+  const fishMenu = normalizeMenu({ dishes: [
+    { id: 'a', originalName: 'Dorade vom Grill', translatedName: '烤鯛魚', glosses: [{ language: 'English', name: 'Grilled sea bream' }], ingredients: [{ name: 'sea bream', source: 'menu' }, { name: 'lemon', source: 'menu' }, { name: 'olive oil', source: 'menu' }], attributes: ['grilled', 'seafood', 'light'] },
+    { id: 'b', originalName: 'Schweinebraten mit Dunkelbiersoße', ingredients: [{ name: 'pork', source: 'menu' }, { name: 'dark beer', source: 'menu' }], attributes: ['rich', 'meat-heavy'] },
+    { id: 'c', originalName: 'Fischsemmel', ingredients: [{ name: 'shellfish', source: 'typical' }], attributes: [] },
+  ] });
+  const recs = recommendLocally(fishMenu, p, { occasion: 'solo' });
+  const bream = recs.picks.find((x) => x.dishId === 'a');
+  assert.equal(recs.picks[0].dishId, 'a');
+  assert.match(bream.whyYou, /not confirmed yet/);
+  assert.match(bream.whyYou, /olive oil and lemon/);
+  assert.ok(recs.cautions.some((c) => c.dishId === 'b' && /Menu lists alcohol/.test(c.reason)), 'Dunkelbiersoße flagged as alcohol');
+  assert.ok(recs.picks.some((x) => x.dishId === 'b'), 'flexible restriction flags but does not exclude');
+  assert.equal(matches('fish', 'shellfish platter'), null);
+  const tricky = normalizeMenu({ dishes: [{ id: 'r', originalName: 'Rumpsteak mit Champignons' }, { id: 'w', originalName: 'Weißwurst', menuDescription: 'mit Weißbier' }] });
+  const flagged = recommendLocally(tricky, p, { occasion: 'solo' }).cautions.map((c) => c.dishId);
+  assert.deepEqual(flagged, ['w']);
 });
 
 test('matches handles phrases, attributes and multi-word subjects', () => {

@@ -32,7 +32,19 @@ Without an API key, the app still runs: the sample menu and the built-in matcher
 
 ## Your starting profile
 
-`shared/seed-profile.json` is loaded the first time the app opens. **It currently holds a placeholder.** Replace it with your own profile using the same shape, or open **Taste profile → Describe yourself in your own words**, paste your profile and keep the entries you want. Use **Reset to starting profile** to reload the seed file.
+`shared/seed-profile.json` holds your food profile and is loaded the first time the app opens. **Taste profile → Reset to starting profile** reloads it.
+
+| your profile section | in the app |
+|---|---|
+| Confirmed or strongly supported | explicit preferences under *You enjoy* / *You'd rather avoid* |
+| Likely, verify through feedback | *To be confirmed*: used, but phrased as "you listed this as likely, not confirmed yet" until feedback or **That's me** confirms them |
+| Does not drink alcohol | a *flexible* restriction: dishes where alcohol is a main component are flagged but not excluded |
+| Do not assume / recommendation behaviour | *Ground rules*, sent with every recommendation request |
+| Language, Munich | settings: explanations in Traditional Chinese, names also in English/German, home city Munich |
+| Solo vs sharing | the occasion starts unset; the app asks when the answer would change its picks |
+| One adventurous option | setting: always reserve one adventurous or regional pick |
+
+The app's own interface is in English; menu translations, explanations and recommendations follow the language setting. The built-in matcher, used when no AI key is configured, writes in English.
 
 ## Architecture
 

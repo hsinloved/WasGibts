@@ -105,8 +105,9 @@ export function makePreference(fields, { by = 'user', source = 'user_stated', no
     subject: String(fields.subject ?? '').trim(),
     note: String(fields.note ?? '').trim(),
     contexts: Array.isArray(fields.contexts) ? fields.contexts.filter((c) => c in OCCASIONS) : [],
-    confidence: clamp01(fields.confidence ?? (origin === 'explicit' ? 0.9 : 0.3)),
-    evidence: fields.evidence ?? [{ source, note, at: t }],
+    confidence: clamp01(fields.confidence ?? (origin === 'explicit' ? 0.9
+      : Math.min(0.7, 0.15 + 0.15 * (fields.evidence ?? []).reduce((s, e) => s + (e.weight ?? 0), 0)))),
+    evidence: (fields.evidence ?? [{ source, note, at: t }]).map((e) => ({ ...e, at: e.at ?? t })),
     history: fields.history ?? [{ at: t, by, action: 'created' }],
     createdAt: fields.createdAt ?? t,
     updatedAt: fields.updatedAt ?? t,
@@ -164,12 +165,23 @@ export function emptyProfile() {
     updatedAt: t,
     about: { name: '', notes: '' },
     settings: {
+      // Language for translated dish names and all explanations.
       translateTo: 'English',
+      // Extra short translations shown under each dish name, when useful.
+      glossLanguages: [],
+      // Where the user lives; frames what counts as "local" or "unfamiliar".
+      homeCity: '',
       // Health-adjacent data is optional. When false, restrictions are kept on
       // this device but never sent to the AI layer.
       shareRestrictionsWithAI: true,
+      // An occasion id, or 'ask' to start each menu without one and ask.
       defaultOccasion: 'solo',
+      // Reserve one pick for something regional or adventurous.
+      includeAdventurousPick: false,
     },
+    // The user's standing instructions for recommendations, in their words
+    // ("Don't assume lighter is always better"). Sent to the AI verbatim.
+    guidance: /** @type {string[]} */ ([]),
     preferences: /** @type {Preference[]} */ ([]),
     restrictions: /** @type {Restriction[]} */ ([]),
     history: /** @type {HistoryEntry[]} */ ([]),
@@ -196,6 +208,9 @@ export function normalizeProfile(raw) {
   p.preferences = (raw.preferences ?? []).map((x) => makePreference(x, seedOpts)).filter((x) => x.subject);
   p.restrictions = (raw.restrictions ?? []).map((x) => makeRestriction(x, seedOpts)).filter((x) => x.subject);
   p.history = (raw.history ?? []).map(makeHistoryEntry).filter((h) => h.dish.originalName);
+  p.guidance = (Array.isArray(raw.guidance) ? raw.guidance : []).map((g) => String(g).trim()).filter(Boolean).slice(0, 40);
+  if (!Array.isArray(p.settings.glossLanguages)) p.settings.glossLanguages = [];
+  if (p.settings.defaultOccasion !== 'ask' && !(p.settings.defaultOccasion in OCCASIONS)) p.settings.defaultOccasion = 'solo';
   return p;
 }
 

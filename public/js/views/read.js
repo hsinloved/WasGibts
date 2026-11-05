@@ -2,7 +2,7 @@ import { h, mount, toast, plural } from '../dom.js';
 import { api, readFiles } from '../api.js';
 import { session } from '../store.js';
 import { OCCASIONS } from '/shared/model.js';
-import { normalizeMenu, priceLabel, dishSnapshot } from '/shared/menu.js';
+import { normalizeMenu, priceLabel, dishSnapshot, STYLE_ATTRIBUTES } from '/shared/menu.js';
 import { profileForAI } from '/shared/profile.js';
 import { recommendLocally, screenRestrictions } from '/shared/recommend.js';
 
@@ -20,7 +20,10 @@ const persist = () => session.set({ menu: state.menu, recs: state.recs, occasion
 
 export function renderRead(root, ctx) {
   const { store } = ctx;
-  state.occasion ??= store.profile.settings.defaultOccasion || 'solo';
+  if (state.occasion === undefined) {
+    const d = store.profile.settings.defaultOccasion;
+    state.occasion = d in OCCASIONS ? d : null; // 'ask' starts unset
+  }
   const rerender = () => renderRead(root, ctx);
 
   mount(root,
@@ -61,9 +64,9 @@ function sourceForm(ctx, rerender) {
     h('legend', {}, 'The occasion'),
     h('div.chips', {}, Object.entries(OCCASIONS).map(([id, o]) => h('button', {
       type: 'button', class: `chip${state.occasion === id ? ' on' : ''}`, 'aria-pressed': String(state.occasion === id), title: o.blurb,
-      onclick: () => { state.occasion = id; persist(); rerender(); },
+      onclick: () => { state.occasion = state.occasion === id ? null : id; persist(); rerender(); },
     }, o.label))),
-    h('p.hint', {}, OCCASIONS[state.occasion]?.blurb),
+    h('p.hint', {}, OCCASIONS[state.occasion]?.blurb ?? 'Not set — I’ll ask if it changes what I’d pick.'),
   ),
   h('label.field', {}, h('span', {}, 'Anything in particular today? ', h('em', {}, 'optional, not saved to your profile')),
     h('input', { type: 'text', maxlength: 300, placeholder: 'e.g. something light, no noodles, I’m starving', value: state.request, oninput: (e) => { state.request = e.target.value; } })),
@@ -81,7 +84,7 @@ async function readMenu(ctx, rerender) {
     if (state.tab === 'sample') {
       state.menu = normalizeMenu(await (await fetch('/shared/sample-menu.json')).json());
     } else {
-      const translateTo = ctx.store.profile.settings.translateTo;
+      const { translateTo, glossLanguages, homeCity } = ctx.store.profile.settings;
       let source;
       if (state.tab === 'url') {
         if (!state.url.trim()) throw new Error('Paste a link first.');
@@ -94,7 +97,7 @@ async function readMenu(ctx, rerender) {
         state.busy = `Reading ${plural(state.files.length, 'page')}…`;
       }
       rerender();
-      state.menu = normalizeMenu(await api.extract(source, translateTo));
+      state.menu = normalizeMenu(await api.extract(source, { translateTo, glossLanguages, homeCity }));
     }
     state.recs = null;
     await refreshPicks(ctx, rerender);
@@ -117,6 +120,7 @@ async function refreshPicks(ctx, rerender) {
       state.busy = 'Matching dishes to your taste…'; rerender();
       state.recs = await api.recommend({
         menu: state.menu, occasion: state.occasion, request: state.request, screen,
+        language: profile.settings.translateTo, includeAdventurous: profile.settings.includeAdventurousPick,
         profile: profileForAI(profile, { occasion: state.occasion }),
       });
     } else {
@@ -149,13 +153,18 @@ function results(ctx, rerender) {
 
     recs && h('section.picks', {},
       h('div.picks-head', {},
-        h('p.eyebrow', {}, `For you · ${OCCASIONS[state.occasion]?.label ?? ''}`),
+        h('p.eyebrow', {}, state.occasion ? `For you · ${OCCASIONS[state.occasion].label}` : 'For you'),
         h('p.headline', {}, recs.headline),
         h('p.engine', {}, recs.engine === 'ai'
           ? 'Picked by the AI from your profile. Details marked “typical” are general knowledge, not from this menu.'
           : 'Picked by the built-in matcher, which only uses exact matches with your profile.'),
         recs.fallbackReason && h('p.error.small', {}, `The AI couldn’t help this time (${recs.fallbackReason}), so these come from the built-in matcher.`),
       ),
+      recs.occasionQuestion && !state.occasion && h('div.ask', {},
+        h('p', {}, recs.occasionQuestion),
+        h('div.chips', {}, ['solo', 'sharing', 'office'].map((id) => h('button.chip', {
+          type: 'button', onclick: () => { state.occasion = id; refreshPicks(ctx, rerender); },
+        }, OCCASIONS[id].label)))),
       h('ol.pick-list', {}, recs.picks.map((p, i) => {
         const d = byId.get(p.dishId);
         return d && pickCard(ctx, d, p, i);
@@ -174,7 +183,7 @@ function results(ctx, rerender) {
         h('h3.menu-section-title', {}, name),
         dishes.map((d) => h('details.dish-row', {},
           h('summary', {},
-            h('span.names', {}, h('span.orig', {}, d.originalName), d.translatedName && h('span.trans', {}, d.translatedName)),
+            h('span.names', {}, h('span.orig', {}, d.originalName), d.translatedName && h('span.trans', {}, d.translatedName), glosses(d)),
             h('span.price', {}, priceLabel(d) ?? '')),
           h('div.dish-body', {}, dishDetail(d), dishActions(ctx, d, false)),
         )),
@@ -189,7 +198,7 @@ function pickCard(ctx, d, p, i) {
     h('article', {},
       h('p.eyebrow.accent', {}, p.role),
       h('header.dish-head', {},
-        h('div', {}, h('h3.dish-name', {}, d.originalName), d.translatedName && h('p.dish-trans', {}, d.translatedName)),
+        h('div', {}, h('h3.dish-name', {}, d.originalName), d.translatedName && h('p.dish-trans', {}, d.translatedName), glosses(d)),
         priceLabel(d) && h('p.price', {}, priceLabel(d)),
       ),
       h('p.why', {}, p.whyYou),
@@ -206,11 +215,17 @@ function pickCard(ctx, d, p, i) {
 
 const evidenceLabel = (t) => ({ preference: 'Your taste', history: 'Past order', restriction: 'Restriction', menu: 'Menu', occasion: 'Occasion' }[t] ?? t);
 
+function glosses(d) {
+  return d.glosses?.length ? h('span.glosses', {}, d.glosses.map((g) => `${g.language}: ${g.name}`).join(' · ')) : null;
+}
+
 export function dishDetail(d) {
+  const style = d.attributes.filter((a) => STYLE_ATTRIBUTES.includes(a));
   const ing = d.ingredients;
   const prep = d.preparation;
   const hasTypical = ing.some((x) => x.source === 'typical') || prep.some((x) => x.source === 'typical');
   return h('div.dish-detail', {},
+    style.length > 0 && h('p.style', {}, style.map((a) => h('span.badge', {}, a))),
     d.explanation && h('p.explain', {}, d.explanation),
     d.menuDescription && h('p.menu-quote', {}, h('span.label', {}, 'On the menu'), ` “${d.menuDescription}”`),
     ing.length > 0 && h('p.facts', {}, h('span.label', {}, 'Ingredients'), ' ', provenanceList(ing, 'name')),

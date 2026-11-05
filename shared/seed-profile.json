@@ -1,28 +1,65 @@
 {
   "$seed": true,
-  "$comment": "PLACEHOLDER seed. Replace this file with your own food profile (same shape), or paste your profile in plain words under Profile → Import in the app. Every entry here is loaded as an explicit preference you can edit or delete.",
+  "$comment": "Starting profile. 'Confirmed or strongly supported' items are explicit preferences. 'Likely' items are unconfirmed suggestions (weight 2, 'fairly sure') that feedback can strengthen and you can confirm or dismiss. 'Do not assume' and 'Recommendation behaviour' are standing guidance sent with every recommendation request.",
   "about": {
     "name": "",
-    "notes": "Placeholder profile — replace with your own."
+    "notes": "Lives in Munich. Eats fish, seafood, meat, eggs and dairy — not vegetarian or pescatarian. Enjoys exploring local cuisine and understanding unfamiliar dishes, and likes recommendations that account for group sharing versus solo meals."
   },
   "settings": {
-    "translateTo": "English",
+    "translateTo": "Traditional Chinese (繁體中文)",
+    "glossLanguages": ["English", "German"],
+    "homeCity": "Munich, Germany",
     "shareRestrictionsWithAI": true,
-    "defaultOccasion": "solo"
+    "defaultOccasion": "ask",
+    "includeAdventurousPick": true
   },
   "preferences": [
-    { "polarity": "like", "category": "flavour", "subject": "sour and fermented flavours", "note": "Pickles, kimchi, vinegar-dressed things" },
-    { "polarity": "like", "category": "ingredient", "subject": "mushrooms" },
-    { "polarity": "like", "category": "technique", "subject": "charcoal grilling" },
-    { "polarity": "like", "category": "cuisine", "subject": "Sichuan" },
-    { "polarity": "like", "category": "texture", "subject": "crisp edges" },
-    { "polarity": "like", "category": "style", "subject": "vegetable-forward dishes", "contexts": ["quick", "office"], "note": "Especially at lunch" },
-    { "polarity": "dislike", "category": "ingredient", "subject": "coriander", "note": "Tastes soapy to me" },
-    { "polarity": "dislike", "category": "style", "subject": "heavy cream sauces" },
-    { "polarity": "dislike", "category": "texture", "subject": "slimy textures", "note": "Okra, natto — not for me" }
+    { "polarity": "like", "category": "cuisine", "subject": "Mediterranean" },
+    { "polarity": "like", "category": "style", "subject": "vegetable-forward dishes" },
+    { "polarity": "like", "category": "ingredient", "subject": "fish", "note": "Often wants fish even when drawn to a vegetable dish" },
+    { "polarity": "like", "category": "style", "subject": "protein-rich, balanced meals", "note": "An interest, not a medical need — pleasure still comes first" },
+    { "polarity": "like", "category": "style", "subject": "regional and local specialities", "note": "Enjoys exploring local cuisine and understanding unfamiliar dishes" },
+    { "polarity": "like", "category": "style", "subject": "less sugary options", "note": "Often, not always" },
+    { "polarity": "like", "category": "ingredient", "subject": "0% fat yoghurt", "note": "Often preferred" },
+    { "polarity": "like", "category": "ingredient", "subject": "skyr" },
+    { "polarity": "like", "category": "ingredient", "subject": "berries" },
+    { "polarity": "like", "category": "ingredient", "subject": "banana" },
+    { "polarity": "like", "category": "ingredient", "subject": "grapefruit" },
+    { "polarity": "dislike", "category": "ingredient", "subject": "orange juice" },
+
+    { "origin": "inferred", "status": "suggested", "polarity": "like", "category": "dish", "subject": "grilled fish",
+      "evidence": [{ "source": "seed", "weight": 2, "note": "Listed as likely in your starting profile — to verify through feedback" }] },
+    { "origin": "inferred", "status": "suggested", "polarity": "like", "category": "ingredient", "subject": "sea bream",
+      "evidence": [{ "source": "seed", "weight": 2, "note": "Listed as likely in your starting profile — to verify through feedback" }] },
+    { "origin": "inferred", "status": "suggested", "polarity": "like", "category": "ingredient", "subject": "octopus",
+      "evidence": [{ "source": "seed", "weight": 2, "note": "Listed as likely in your starting profile — to verify through feedback" }] },
+    { "origin": "inferred", "status": "suggested", "polarity": "like", "category": "dish", "subject": "seafood mezze",
+      "evidence": [{ "source": "seed", "weight": 2, "note": "Listed as likely in your starting profile — to verify through feedback" }] },
+    { "origin": "inferred", "status": "suggested", "polarity": "like", "category": "style", "subject": "vegetables with eggs, cheese or another protein",
+      "evidence": [{ "source": "seed", "weight": 2, "note": "Listed as likely in your starting profile — to verify through feedback" }] },
+    { "origin": "inferred", "status": "suggested", "polarity": "like", "category": "flavour", "subject": "olive oil and lemon", "note": "Savoury Mediterranean combinations",
+      "evidence": [{ "source": "seed", "weight": 2, "note": "Listed as likely in your starting profile — to verify through feedback" }] },
+    { "origin": "inferred", "status": "suggested", "polarity": "like", "category": "style", "subject": "dishes balancing vegetables and protein",
+      "evidence": [{ "source": "seed", "weight": 2, "note": "Listed as likely in your starting profile — to verify through feedback" }] },
+    { "origin": "inferred", "status": "suggested", "polarity": "like", "category": "style", "subject": "regional specialities at culturally distinctive places", "contexts": ["adventurous", "solo", "sharing"],
+      "evidence": [{ "source": "seed", "weight": 2, "note": "Listed as likely in your starting profile — to verify through feedback" }] }
   ],
   "restrictions": [
-    { "type": "allergy", "subject": "peanuts", "severity": "strict", "note": "Placeholder example — remove if not true" }
+    { "type": "avoid", "subject": "alcohol", "severity": "flexible",
+      "note": "Doesn't drink alcohol. Flag dishes where alcohol is a main component (beer batter, wine-braised, boozy desserts). A personal choice, not a medical or religious rule." }
+  ],
+  "guidance": [
+    "Do not assume a garlic or onion intolerance or dislike.",
+    "Do not assume strict dietary restrictions.",
+    "Do not assume that lighter or lower-calorie is always better.",
+    "Do not assume protein optimisation matters more than pleasure.",
+    "A past recommendation does not prove I liked a dish.",
+    "Do not infer medical dietary needs from nutrition goals.",
+    "Rank picks by how much I'm likely to enjoy them.",
+    "Explain unfamiliar dish names and ingredients.",
+    "Name the preparation style: grilled, fried, raw, creamy or rich.",
+    "Include one adventurous or regional option.",
+    "Distinguish confirmed facts from predictions."
   ],
   "history": []
 }

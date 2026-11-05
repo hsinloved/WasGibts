@@ -7,7 +7,7 @@
 // suggested pattern, a past order, or a word on the menu.
 
 import { FEEDBACK, OCCASIONS, subjectKey, confidenceLabel } from './model.js';
-import { isEmerging } from './profile.js';
+import { isEmerging, isUnverifiedPrior } from './profile.js';
 import { dishText } from './menu.js';
 
 const OCCASION_RULES = {
@@ -24,30 +24,62 @@ function menuText(d) {
     ...d.preparation.filter((x) => x.source === 'menu').map((x) => x.method), ...d.dietary.menuStated].filter(Boolean).join(' · ').toLowerCase();
 }
 
-const words = (s) => subjectKey(s).split(/[^\p{L}\p{N}-]+/u).filter((w) => w.length > 2);
+const STOP = new Set(['and', 'with', 'the', 'other', 'another', 'dishes', 'dish', 'food', 'options', 'meals', 'places', 'some', 'any', 'for']);
+const words = (s) => subjectKey(s).split(/[^\p{L}\p{N}%-]+/u).filter((w) => w.length > 2 && !STOP.has(w));
+const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Word starts at a boundary: "fish" matches "fish" and "fishes" but not "shellfish". */
+const has = (text, w) => new RegExp(`(^|[^\\p{L}])${escape(w)}`, 'u').test(text);
 
 /** Does this preference's subject show up in the dish? Returns the matched words. */
 export function matches(subject, text, attributes = []) {
   const key = subjectKey(subject);
   if (!key) return null;
-  if (text.includes(key)) return key;
+  if (has(text, key)) return key;
   // Phrases from feedback ("rich, heavy dishes") match on attribute words.
   const attr = attributes.find((a) => key.split(/[^a-z-]+/).includes(a));
   if (attr) return attr;
   // Multi-word subjects: every significant word must appear.
   const ws = words(key);
-  if (ws.length > 1 && ws.every((w) => text.includes(w))) return key;
+  if (ws.length > 1 && ws.every((w) => has(text, w))) return key;
   return null;
 }
+
+/**
+ * Words menus actually use for common restrictions (English and German).
+ * Matched as substrings, so compounds like "Dunkelbiersoße" are caught.
+ * This is a coarse safety net; the AI layer reads menus with more nuance.
+ */
+export const RESTRICTION_TERMS = {
+  alcohol: ['alcohol', 'alkohol', 'beer', 'bier', 'wine', 'wein', 'sekt', 'prosecco', 'champagne', 'rum', 'brandy', 'cognac', 'liqueur', 'likör', 'schnaps', 'vodka', 'whisky', 'grappa', 'marsala', 'sherry', 'sake', 'radler', 'weißbier', 'weissbier'],
+  peanuts: ['peanut', 'erdnuss'],
+  nuts: ['nut', 'nuss', 'almond', 'mandel', 'hazelnut', 'haselnuss', 'walnut', 'walnuss', 'cashew', 'pistachio', 'pistazie', 'pecan'],
+  shellfish: ['shellfish', 'shrimp', 'prawn', 'garnele', 'crab', 'krabbe', 'lobster', 'hummer', 'scampi', 'mussel', 'muschel', 'oyster', 'auster', 'scallop', 'jakobsmuschel'],
+  gluten: ['gluten', 'wheat', 'weizen', 'flour', 'mehl', 'bread', 'brot', 'breadcrumb', 'paniert', 'semmel', 'noodle', 'nudel', 'pasta', 'spätzle', 'knödel', 'barley', 'gerste', 'rye', 'roggen'],
+  lactose: ['lactose', 'laktose', 'milk', 'milch', 'cream', 'sahne', 'rahm', 'butter', 'cheese', 'käse', 'yoghurt', 'joghurt', 'quark'],
+  pork: ['pork', 'schwein', 'bacon', 'speck', 'ham', 'schinken', 'leberkäs', 'weißwurst', 'weisswurst', 'bratwurst'],
+};
+
+const termsFor = (subject) => {
+  const key = subjectKey(subject);
+  const list = RESTRICTION_TERMS[key] ?? RESTRICTION_TERMS[key.replace(/s$/, '')] ?? RESTRICTION_TERMS[`${key}s`] ?? [];
+  return [key, ...list];
+};
+
+// Long terms match inside compounds (Dunkelbiersoße); short ones must be whole
+// words so "rum" skips "Rumpsteak" and "ham" skips "Champignons".
+const termIn = (text, t) => (t.length >= 5 ? text.includes(t)
+  : new RegExp(`(^|[^\\p{L}])${escape(t)}(s|e|es)?([^\\p{L}]|$)`, 'u').test(text));
 
 export function screenRestrictions(menu, profile) {
   const out = new Map();
   for (const d of menu.dishes) {
     const text = dishText(d);
+    const printed = [d.originalName, d.menuDescription, ...d.ingredients.filter((x) => x.source === 'menu').map((x) => x.name)].filter(Boolean).join(' ').toLowerCase();
     for (const r of profile.restrictions) {
-      if (matches(r.subject, text, d.attributes)) {
-        const verified = d.ingredients.some((x) => x.source === 'menu' && x.name.toLowerCase().includes(subjectKey(r.subject)))
-          || (d.menuDescription ?? '').toLowerCase().includes(subjectKey(r.subject));
+      const terms = termsFor(r.subject);
+      const hit = matches(r.subject, text, d.attributes) || terms.find((t) => termIn(text, t));
+      if (hit) {
+        const verified = terms.some((t) => termIn(printed, t));
         out.set(d.id, [...(out.get(d.id) ?? []), { restriction: r, verified }]);
       }
     }
@@ -56,10 +88,10 @@ export function screenRestrictions(menu, profile) {
 }
 
 export function recommendLocally(menu, profile, context = {}) {
-  const occasion = context.occasion in OCCASIONS ? context.occasion : 'solo';
-  const rules = OCCASION_RULES[occasion];
+  const occasion = context.occasion in OCCASIONS ? context.occasion : null;
+  const rules = OCCASION_RULES[occasion] ?? { plus: [], minus: [] };
   const prefs = profile.preferences.filter(
-    (p) => p.status !== 'dismissed' && !isEmerging(p) && (!p.contexts.length || p.contexts.includes(occasion)),
+    (p) => p.status !== 'dismissed' && !isEmerging(p) && (!p.contexts.length || (occasion && p.contexts.includes(occasion))),
   );
   const flagged = screenRestrictions(menu, profile);
   const orderedAgain = new Map(
@@ -84,7 +116,8 @@ export function recommendLocally(menu, profile, context = {}) {
       if (!hit) continue;
       const onMenu = Boolean(matches(p.subject, verifiedText, d.attributes));
       const w = (p.origin === 'explicit' ? 1 : 0.6) * (0.4 + p.confidence) * (onMenu ? 1 : 0.6);
-      const how = p.origin === 'explicit' ? 'you told me' : p.status === 'active' ? 'you confirmed' : `a pattern from your feedback, ${confidenceLabel(p.confidence)}`;
+      const how = p.origin === 'explicit' ? 'you told me' : p.status === 'active' ? 'you confirmed'
+        : isUnverifiedPrior(p) ? 'you listed this as likely; not confirmed yet' : `a pattern from your feedback, ${confidenceLabel(p.confidence)}`;
       const where = onMenu ? (hit === subjectKey(p.subject) ? '' : ` — this one is ${hit}`) : ` — it usually has ${hit}, though the menu doesn’t say`;
       if (p.polarity === 'like') {
         score += w;
@@ -130,8 +163,27 @@ export function recommendLocally(menu, profile, context = {}) {
       : 'Nothing in your profile points at this one yet; it is here to round out the shortlist.',
     evidence: s.evidence,
     concerns: s.concerns,
-    occasionFit: OCCASIONS[occasion].blurb,
+    occasionFit: occasion ? OCCASIONS[occasion].blurb : '',
   }));
+
+  // One pick reserved for something regional or adventurous, if wanted.
+  if (profile.settings?.includeAdventurousPick) {
+    const chosen = new Set(picks.map((p) => p.dishId));
+    const daring = eligible.find((s) => !chosen.has(s.d.id) && s.d.attributes.some((a) => a === 'unusual' || a === 'fermented'))
+      ?? eligible.find((s) => !chosen.has(s.d.id) && s.d.culturalNote);
+    const already = picks.find((p) => { const d = menu.dishes.find((x) => x.id === p.dishId); return d.attributes.includes('unusual'); });
+    if (daring && !already) {
+      const pick = {
+        dishId: daring.d.id,
+        role: 'A little adventure',
+        whyYou: [daring.d.culturalNote ? 'Something more distinctive to try.' : 'A less familiar choice to stretch the order a little.', ...daring.evidence.map((e) => e.text)].join(' '),
+        evidence: [...daring.evidence, { type: 'menu', ref: null, text: daring.d.culturalNote ?? 'Marked as unusual or fermented.' }],
+        concerns: daring.concerns,
+        occasionFit: occasion ? OCCASIONS[occasion].blurb : '',
+      };
+      if (picks.length >= 5) picks[picks.length - 1] = pick; else picks.push(pick);
+    }
+  }
 
   const cautions = scored.filter((s) => s.hits.length).map((s) => ({
     dishId: s.d.id,
@@ -153,5 +205,6 @@ export function recommendLocally(menu, profile, context = {}) {
     picks,
     cautions,
     orderingTip: null,
+    occasionQuestion: occasion ? null : 'Eating solo, sharing, or ordering in? It changes which dishes travel and share well.',
   };
 }

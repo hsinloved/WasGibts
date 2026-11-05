@@ -26,6 +26,8 @@ const HEADERS = {
   'Content-Security-Policy': "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'",
 };
 
+const clip = (v, n) => String(v ?? '').slice(0, n);
+
 class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 
 function send(res, status, body, headers = {}) {
@@ -89,7 +91,12 @@ const routes = {
     const input = src.type === 'url' ? await partsFromUrl(String(src.url ?? '').trim())
       : src.type === 'files' ? partsFromFiles(src.files)
       : (() => { throw new HttpError(400, 'Provide a URL or files.'); })();
-    const raw = await extractMenu({ parts: input.parts, translateTo: body.translateTo || 'English' });
+    const raw = await extractMenu({
+      parts: input.parts,
+      translateTo: clip(body.translateTo, 60) || 'English',
+      glossLanguages: (Array.isArray(body.glossLanguages) ? body.glossLanguages : []).slice(0, 4).map((g) => clip(g, 30)),
+      homeCity: clip(body.homeCity, 80),
+    });
     const menu = normalizeMenu({ ...raw, source: { kind: input.kind, label: input.label, url: input.url } });
     if (input.truncated) menu.notes.push('The page was very long; only the first part was read.');
     if (!menu.dishes.length) throw new HttpError(422, menu.notes[0] || 'No dishes found in that source.');
@@ -105,8 +112,10 @@ const routes = {
     return recommend({
       menu,
       profileView: body.profile ?? { preferences: [], restrictions: [] },
-      occasion: body.occasion,
-      request: String(body.request ?? '').slice(0, 500),
+      occasion: body.occasion ?? null,
+      language: clip(body.language, 60) || 'English',
+      includeAdventurous: Boolean(body.includeAdventurous),
+      request: clip(body.request, 500),
       screen: Array.isArray(body.screen) ? body.screen.slice(0, 50) : [],
     });
   },
