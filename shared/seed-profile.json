@@ -1,0 +1,28 @@
+{
+  "$seed": true,
+  "$comment": "PLACEHOLDER seed. Replace this file with your own food profile (same shape), or paste your profile in plain words under Profile → Import in the app. Every entry here is loaded as an explicit preference you can edit or delete.",
+  "about": {
+    "name": "",
+    "notes": "Placeholder profile — replace with your own."
+  },
+  "settings": {
+    "translateTo": "English",
+    "shareRestrictionsWithAI": true,
+    "defaultOccasion": "solo"
+  },
+  "preferences": [
+    { "polarity": "like", "category": "flavour", "subject": "sour and fermented flavours", "note": "Pickles, kimchi, vinegar-dressed things" },
+    { "polarity": "like", "category": "ingredient", "subject": "mushrooms" },
+    { "polarity": "like", "category": "technique", "subject": "charcoal grilling" },
+    { "polarity": "like", "category": "cuisine", "subject": "Sichuan" },
+    { "polarity": "like", "category": "texture", "subject": "crisp edges" },
+    { "polarity": "like", "category": "style", "subject": "vegetable-forward dishes", "contexts": ["quick", "office"], "note": "Especially at lunch" },
+    { "polarity": "dislike", "category": "ingredient", "subject": "coriander", "note": "Tastes soapy to me" },
+    { "polarity": "dislike", "category": "style", "subject": "heavy cream sauces" },
+    { "polarity": "dislike", "category": "texture", "subject": "slimy textures", "note": "Okra, natto — not for me" }
+  ],
+  "restrictions": [
+    { "type": "allergy", "subject": "peanuts", "severity": "strict", "note": "Placeholder example — remove if not true" }
+  ],
+  "history": []
+}

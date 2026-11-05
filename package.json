@@ -1,0 +1,16 @@
+{
+  "name": "wasgibts",
+  "version": "0.1.0",
+  "description": "WasGibts? A personal AI menu companion",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20.6" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --watch --env-file-if-exists=.env server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.5.0"
+  }
+}

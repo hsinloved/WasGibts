@@ -1,0 +1,106 @@
+{
+  "restaurant": { "name": "Haus Zhang (sample menu)", "cuisine": "Sichuan", "menuLanguage": "Chinese / German", "currency": "EUR" },
+  "source": { "kind": "sample", "label": "Built-in sample menu", "url": null },
+  "notes": ["This is a fictional sample menu bundled with WasGibts so you can try the app without an AI key."],
+  "dishes": [
+    {
+      "id": "d1", "section": "Kalte Vorspeisen", "originalName": "拍黄瓜 Pai Huanggua", "translatedName": "Smashed cucumber salad",
+      "menuDescription": "Gurke, Knoblauch, schwarzer Essig, Chiliöl", "price": { "amount": 6.5, "currency": "EUR", "display": "6,50 €" },
+      "explanation": "Cucumbers cracked with a cleaver so the dressing soaks into the rough edges, served cold.",
+      "ingredients": [{ "name": "cucumber", "source": "menu" }, { "name": "garlic", "source": "menu" }, { "name": "black vinegar", "source": "menu" }, { "name": "chilli oil", "source": "menu" }, { "name": "sesame oil", "source": "typical" }],
+      "preparation": [{ "method": "smashed and dressed raw", "source": "typical" }],
+      "flavours": ["sour", "garlicky", "gently hot"], "textures": ["crunchy", "cold"], "cuisine": "Sichuan", "region": "Sichuan",
+      "culturalNote": "A standard cooling side in Sichuan meals, there to balance richer, hotter dishes.",
+      "attributes": ["light", "vegetable-forward", "sour", "shareable", "quick", "raw"],
+      "dietary": { "menuStated": [], "likely": ["vegan as described"] }, "uncertainty": null
+    },
+    {
+      "id": "d2", "section": "Kalte Vorspeisen", "originalName": "口水鸡 Kou Shui Ji", "translatedName": "\"Mouth-watering\" chicken",
+      "menuDescription": "Kalte Hähnchenbrust in Chiliöl mit Erdnüssen und Sesam", "price": { "amount": 11.0, "currency": "EUR", "display": "11,00 €" },
+      "explanation": "Cold poached chicken sliced and drowned in a red chilli-oil dressing, scattered with peanuts.",
+      "ingredients": [{ "name": "chicken breast", "source": "menu" }, { "name": "chilli oil", "source": "menu" }, { "name": "peanuts", "source": "menu" }, { "name": "sesame", "source": "menu" }, { "name": "Sichuan pepper", "source": "typical" }],
+      "preparation": [{ "method": "poached, served cold", "source": "menu" }],
+      "flavours": ["numbing", "hot", "nutty", "slightly sweet"], "textures": ["tender", "silky"], "cuisine": "Sichuan", "region": "Sichuan",
+      "culturalNote": "The name refers to the dish making your mouth water — it is about anticipation, not saliva in the food.",
+      "attributes": ["spicy", "shareable"],
+      "dietary": { "menuStated": [], "likely": ["contains peanuts"] }, "uncertainty": null
+    },
+    {
+      "id": "d3", "section": "Hauptgerichte", "originalName": "麻婆豆腐 Mapo Doufu", "translatedName": "Mapo tofu",
+      "menuDescription": "Seidentofu, Rinderhack, Bohnenpaste, Sichuanpfeffer", "price": { "amount": 14.5, "currency": "EUR", "display": "14,50 €" },
+      "explanation": "Soft tofu simmered in a glossy, fiery sauce of fermented broad-bean paste with a little minced beef.",
+      "ingredients": [{ "name": "silken tofu", "source": "menu" }, { "name": "minced beef", "source": "menu" }, { "name": "doubanjiang (fermented bean paste)", "source": "menu" }, { "name": "Sichuan pepper", "source": "menu" }, { "name": "fermented black beans", "source": "typical" }],
+      "preparation": [{ "method": "simmered in sauce", "source": "typical" }],
+      "flavours": ["numbing", "hot", "savoury", "fermented"], "textures": ["soft", "silky"], "cuisine": "Sichuan", "region": "Chengdu",
+      "culturalNote": "Named after a pockmarked ('ma') old woman ('po') said to have sold it in 19th-century Chengdu.",
+      "attributes": ["spicy", "fermented", "rich"],
+      "dietary": { "menuStated": [], "likely": [] }, "uncertainty": null
+    },
+    {
+      "id": "d4", "section": "Hauptgerichte", "originalName": "干煸四季豆 Gan Bian Si Ji Dou", "translatedName": "Dry-fried green beans",
+      "menuDescription": "Grüne Bohnen, Schweinehack, eingelegtes Gemüse", "price": { "amount": 13.0, "currency": "EUR", "display": "13,00 €" },
+      "explanation": "Green beans fried until blistered and wrinkled, then tossed with crisp pork mince and pickled greens.",
+      "ingredients": [{ "name": "green beans", "source": "menu" }, { "name": "pork mince", "source": "menu" }, { "name": "pickled mustard greens", "source": "menu" }, { "name": "dried chillies", "source": "typical" }],
+      "preparation": [{ "method": "dry-fried", "source": "typical" }],
+      "flavours": ["savoury", "smoky", "lightly hot"], "textures": ["blistered", "crisp edges"], "cuisine": "Sichuan", "region": "Sichuan",
+      "culturalNote": null,
+      "attributes": ["vegetable-forward", "fried", "shareable", "travels-well"],
+      "dietary": { "menuStated": [], "likely": [] }, "uncertainty": null
+    },
+    {
+      "id": "d5", "section": "Hauptgerichte", "originalName": "水煮鱼 Shui Zhu Yu", "translatedName": "Fish poached in chilli oil",
+      "menuDescription": "Pangasiusfilet, Sojasprossen, viel getrocknete Chili", "price": { "amount": 22.0, "currency": "EUR", "display": "22,00 €" },
+      "explanation": "A large bowl of tender fish slices in a slick of chilli oil, piled with dried chillies and Sichuan pepper.",
+      "ingredients": [{ "name": "pangasius fillet", "source": "menu" }, { "name": "bean sprouts", "source": "menu" }, { "name": "dried chillies", "source": "menu" }, { "name": "Sichuan pepper", "source": "typical" }],
+      "preparation": [{ "method": "poached, finished with sizzling oil", "source": "typical" }],
+      "flavours": ["very hot", "numbing"], "textures": ["tender", "silky"], "cuisine": "Sichuan", "region": "Chongqing",
+      "culturalNote": "Despite the name ('water-boiled fish') the bowl is mostly oil; you eat the fish and leave the oil.",
+      "attributes": ["spicy", "seafood", "shareable", "messy", "rich"],
+      "dietary": { "menuStated": [], "likely": ["contains fish"] }, "uncertainty": null
+    },
+    {
+      "id": "d6", "section": "Hauptgerichte", "originalName": "鱼香茄子 Yu Xiang Qiezi", "translatedName": "Fish-fragrant aubergine",
+      "menuDescription": "Aubergine in süß-saurer Chilisauce (vegetarisch)", "price": { "amount": 13.5, "currency": "EUR", "display": "13,50 €" },
+      "explanation": "Soft, silky aubergine in a sweet, sour and gently hot garlic-ginger sauce.",
+      "ingredients": [{ "name": "aubergine", "source": "menu" }, { "name": "pickled chilli", "source": "typical" }, { "name": "garlic", "source": "typical" }, { "name": "ginger", "source": "typical" }, { "name": "vinegar", "source": "typical" }],
+      "preparation": [{ "method": "fried, then braised in sauce", "source": "typical" }],
+      "flavours": ["sweet", "sour", "garlicky", "mildly hot"], "textures": ["soft", "silky"], "cuisine": "Sichuan", "region": "Sichuan",
+      "culturalNote": "\"Fish-fragrant\" names a seasoning style used for fish; there is no fish in it.",
+      "attributes": ["vegetable-forward", "sweet", "sour"],
+      "dietary": { "menuStated": ["vegetarisch"], "likely": [] }, "uncertainty": null
+    },
+    {
+      "id": "d7", "section": "Hauptgerichte", "originalName": "回锅肉 Hui Guo Rou", "translatedName": "Twice-cooked pork",
+      "menuDescription": "Schweinebauch, Lauch, Bohnenpaste", "price": { "amount": 16.0, "currency": "EUR", "display": "16,00 €" },
+      "explanation": "Pork belly boiled, sliced thin, then stir-fried with leeks and chilli bean paste until the edges curl.",
+      "ingredients": [{ "name": "pork belly", "source": "menu" }, { "name": "leek", "source": "menu" }, { "name": "doubanjiang (fermented bean paste)", "source": "menu" }],
+      "preparation": [{ "method": "boiled then stir-fried", "source": "typical" }],
+      "flavours": ["savoury", "fermented", "lightly hot"], "textures": ["crisp edges", "fatty"], "cuisine": "Sichuan", "region": "Sichuan",
+      "culturalNote": "A Sichuan home-cooking classic; 'back to the pot' refers to the second cooking.",
+      "attributes": ["rich", "meat-heavy", "fermented", "travels-well"],
+      "dietary": { "menuStated": [], "likely": [] }, "uncertainty": null
+    },
+    {
+      "id": "d8", "section": "Nudeln", "originalName": "担担面 Dan Dan Mian", "translatedName": "Dan dan noodles",
+      "menuDescription": "Weizennudeln, Sesampaste, Chiliöl, Hackfleisch", "price": { "amount": 12.0, "currency": "EUR", "display": "12,00 €" },
+      "explanation": "A small bowl of noodles with little sauce at the bottom; you mix it up so the chilli oil and sesame coat everything.",
+      "ingredients": [{ "name": "wheat noodles", "source": "menu" }, { "name": "sesame paste", "source": "menu" }, { "name": "chilli oil", "source": "menu" }, { "name": "minced meat", "source": "menu" }, { "name": "preserved mustard greens", "source": "typical" }],
+      "preparation": [{ "method": "boiled noodles, tossed", "source": "typical" }],
+      "flavours": ["nutty", "hot", "numbing"], "textures": ["chewy"], "cuisine": "Sichuan", "region": "Chengdu",
+      "culturalNote": "Once sold by street vendors carrying two baskets on a shoulder pole — the 'dan'.",
+      "attributes": ["spicy", "quick", "filling"],
+      "dietary": { "menuStated": [], "likely": ["may contain peanuts in some versions"] }, "uncertainty": "The menu does not say which meat is used."
+    },
+    {
+      "id": "d9", "section": "Suppen", "originalName": "酸辣汤 Suan La Tang", "translatedName": "Hot and sour soup",
+      "menuDescription": null, "price": { "amount": 5.5, "currency": "EUR", "display": "5,50 €" },
+      "explanation": "A thickened broth sharp with vinegar and white pepper, usually with tofu, mushrooms and egg ribbons.",
+      "ingredients": [{ "name": "tofu", "source": "typical" }, { "name": "wood-ear mushrooms", "source": "typical" }, { "name": "egg", "source": "typical" }, { "name": "vinegar", "source": "typical" }, { "name": "white pepper", "source": "typical" }],
+      "preparation": [{ "method": "simmered, thickened", "source": "typical" }],
+      "flavours": ["sour", "peppery"], "textures": ["silky", "slippery"], "cuisine": "Sichuan", "region": null,
+      "culturalNote": null,
+      "attributes": ["soup", "sour", "light", "quick"],
+      "dietary": { "menuStated": [], "likely": [] }, "uncertainty": "No description on the menu; ingredients are what this soup usually contains."
+    }
+  ]
+}
