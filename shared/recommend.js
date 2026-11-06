@@ -28,8 +28,11 @@ function menuText(d) {
 const STOP = new Set(['and', 'with', 'the', 'other', 'another', 'dishes', 'dish', 'food', 'options', 'meals', 'places', 'some', 'any', 'for']);
 const words = (s) => subjectKey(s).split(/[^\p{L}\p{N}%-]+/u).filter((w) => w.length > 2 && !STOP.has(w));
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** Word starts at a boundary: "fish" matches "fish" and "fishes" but not "shellfish". */
-const has = (text, w) => new RegExp(`(^|[^\\p{L}])${escape(w)}`, 'u').test(text);
+/**
+ * Whole-word match, plurals allowed: "fish" matches "fish" and "fishes" but not
+ * "shellfish" or "fish-fragrant" (a seasoning style with no fish in it).
+ */
+const has = (text, w) => new RegExp(`(^|[^\\p{L}-])${escape(w)}(s|es)?(?![\\p{L}-])`, 'u').test(text);
 
 /** Does this preference's subject show up in the dish? Returns the matched words. */
 export function matches(subject, text, attributes = []) {

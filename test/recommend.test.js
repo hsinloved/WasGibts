@@ -97,6 +97,9 @@ test('real seed: fish matches fish dishes, hedges unverified likes, flags alcoho
   assert.ok(recs.cautions.some((c) => c.dishId === 'b' && /Menu lists alcohol/.test(c.reason)), 'Dunkelbiersoße flagged as alcohol');
   assert.ok(recs.picks.some((x) => x.dishId === 'b'), 'flexible restriction flags but does not exclude');
   assert.equal(matches('fish', 'shellfish platter'), null);
+  assert.equal(matches('fish', 'fish-fragrant aubergine'), null);
+  assert.ok(matches('fish', 'grilled fish of the day'));
+  assert.ok(matches('mushroom', 'wood-ear mushrooms'));
   const tricky = normalizeMenu({ dishes: [{ id: 'r', originalName: 'Rumpsteak mit Champignons' }, { id: 'w', originalName: 'Weißwurst', menuDescription: 'mit Weißbier' }] });
   const flagged = recommendLocally(tricky, p, { occasion: 'solo' }).cautions.map((c) => c.dishId);
   assert.deepEqual(flagged, ['w']);
