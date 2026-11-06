@@ -194,6 +194,11 @@ async function readMenu(ctx, rerender) {
         if (!state.pages.length) throw new Error('Take a photo or add a screenshot first.');
         state.busy = 'Preparing your pages…'; rerender();
         source = { type: 'files', files: await readFiles(state.pages.map((p) => p.file)) };
+        const size = source.files.reduce((n, f) => n + f.data.length, 0);
+        const max = ctx.ai.maxUploadBytes ?? Infinity;
+        if (size > max - 50_000) {
+          throw new Error(`That’s ${(size / 1e6).toFixed(1)} MB — more than the server accepts at once (${(max / 1e6).toFixed(1)} MB). Read fewer pages at a time, or use photos instead of a large PDF.`);
+        }
         state.busy = `Reading ${plural(state.pages.length, 'page')}…`;
       }
       rerender();

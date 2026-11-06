@@ -22,7 +22,7 @@ export const api = {
 };
 
 const MAX_PDF = 20 * 1024 * 1024;
-const MAX_EDGE = 2000; // px; keeps photos well under the per-image limit and still legible
+const MAX_EDGE = 1600; // px; menu text stays legible and 8 pages fit in one hosted request
 
 /** Read File objects into the { name, mediaType, data } shape the server expects. */
 export async function readFiles(fileList) {
@@ -55,7 +55,7 @@ async function downscale(file) {
   canvas.width = Math.round(bmp.width * scale);
   canvas.height = Math.round(bmp.height * scale);
   canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
-  const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.85));
+  const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.8));
   return toBase64(blob);
 }
 

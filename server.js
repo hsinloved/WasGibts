@@ -6,7 +6,7 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { extractMenu, recommend, parseProfile, aiInfo, aiAvailable, AIError } from './lib/ai.js';
 import { partsFromFiles, SourceError } from './lib/sources.js';
 import { resolveLinkSource } from './lib/resolve.js';
@@ -18,7 +18,9 @@ const ROOTS = {
   '/shared/': fileURLToPath(new URL('./shared/', import.meta.url)),
   '/': fileURLToPath(new URL('./public/', import.meta.url)),
 };
-const LIMITS = { extract: 32 * 1024 * 1024, default: 1024 * 1024 };
+// Vercel functions accept request bodies up to 4.5 MB; self-hosted can take more.
+const MAX_UPLOAD = Number(process.env.WASGIBTS_MAX_UPLOAD) || (process.env.VERCEL ? 4_300_000 : 32 * 1024 * 1024);
+const LIMITS = { extract: MAX_UPLOAD, default: 1024 * 1024 };
 
 const HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -43,7 +45,7 @@ async function readJson(req, limit) {
   let size = 0; const chunks = [];
   for await (const c of req) {
     size += c.length;
-    if (size > limit) throw new HttpError(413, 'That upload is too large.');
+    if (size > limit) throw new HttpError(413, 'That upload is too large. Try fewer pages at a time, or a smaller PDF.');
     chunks.push(c);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { throw new HttpError(400, 'Invalid JSON'); }
@@ -84,7 +86,7 @@ async function serveStatic(pathname, res) {
 
 const routes = {
   'GET /healthz': async () => ({ ok: true }),
-  'GET /api/status': async () => aiInfo(),
+  'GET /api/status': async () => ({ ...aiInfo(), maxUploadBytes: MAX_UPLOAD }),
 
   'POST /api/menu/extract': async (req) => {
     requireAI();
@@ -146,8 +148,11 @@ const routes = {
   },
 };
 
-const server = createServer(async (req, res) => {
-  const { pathname } = new URL(req.url, 'http://x');
+/** Request handler. Used by the local server below and by the Vercel function in api/index.js. */
+export async function handle(req, res) {
+  const parsed = new URL(req.url, 'http://x');
+  // On Vercel, requests arrive via a rewrite that carries the original path.
+  const pathname = parsed.searchParams.get('__path') ?? parsed.pathname;
   const handler = routes[`${req.method} ${pathname}`];
   try {
     if (handler) {
@@ -162,8 +167,11 @@ const server = createServer(async (req, res) => {
     if (!known) console.error(err);
     send(res, known ? err.status : 500, { error: known ? err.message : 'Something went wrong.' });
   }
-});
+}
 
-server.listen(PORT, HOST, () => {
-  console.log(`WasGibts on http://${HOST}:${PORT}  (AI: ${aiAvailable() ? aiInfo().model : 'off — sample menu + built-in matcher only'})`);
-});
+// Run a server only when started directly (npm start, Docker), not when imported by Vercel.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  createServer(handle).listen(PORT, HOST, () => {
+    console.log(`WasGibts on http://${HOST}:${PORT}  (AI: ${aiAvailable() ? aiInfo().model : 'off — sample menu + built-in matcher only'})`);
+  });
+}
