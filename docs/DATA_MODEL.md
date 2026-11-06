@@ -104,9 +104,13 @@ Every personal claim must point to a preference, restriction, past order, menu f
 
 ## Main user flows
 
-1. **Read a menu.** Choose a source (link, photos/PDF or the sample) → pick an occasion → optionally add today's wish → *Read the menu*.
+0. **Get the menu in.** Three entry points (see README → *Three ways in*):
+   - photos at the table, or screenshots from Maps or a delivery app (`files`)
+   - a link (`url`): a website or PDF is read directly. A Google Maps link is resolved to a place, then web search finds the restaurant's own menu. A delivery platform is read directly, falling back to the restaurant's own menu if blocked. See `lib/resolve.js`.
+   - a share from another app into the installed PWA. `/sw.js` stashes the shared link or files and the page picks them up (`receiveShare`).
+1. **Read a menu.** Choose a source (photos, link or the sample) → pick an occasion → optionally add today's wish → *Read the menu*.
    Server: fetch/convert → AI extraction → normalise. Client: pre-screen restrictions → AI recommendation (falling back to the local matcher) → render picks, then the whole menu.
-2. **Order.** On any dish, choose *I'm ordering this* or *Save for later*. This adds a journal entry. The profile does not change.
+2. **Order.** On any dish, choose *I'm ordering this* or *Save for later*. This adds a journal entry. The profile does not change. Ordered dishes collect in **Your order**, which offers *Show to staff* (original names, large) and *Copy for chat*.
 3. **Give feedback.** In the journal, pick feedback chips and optionally add a note. A live preview shows what each choice will teach before it is saved.
 4. **Review patterns.** In the profile, *Patterns I've noticed* shows each suggestion with *That's me / Not me / Edit* and its full evidence and history.
 5. **Manage the profile.** Add or edit likes, dislikes and restrictions. Describe yourself in your own words: the AI proposes entries, each with the quote it came from, and you tick which to keep. Export, import, reset to the starting profile, or delete everything.

@@ -35,6 +35,7 @@ export const OCCASIONS = /** @type {const} */ ({
   solo: { label: 'Solo dinner', blurb: 'Just you. Order exactly what you want.' },
   sharing: { label: 'Group sharing', blurb: 'Plates that travel well around a table.' },
   office: { label: 'Office delivery', blurb: 'Survives a commute, eats tidily at a desk.' },
+  delivery: { label: 'Delivery at home', blurb: 'Travels well and is still good after twenty minutes in a bag.' },
   adventurous: { label: 'Adventurous', blurb: 'Stretch a little beyond the usual.' },
   quick: { label: 'Quick lunch', blurb: 'Fast, light enough for the afternoon.' },
 });

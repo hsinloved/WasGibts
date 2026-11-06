@@ -8,7 +8,8 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractMenu, recommend, parseProfile, aiInfo, aiAvailable, AIError } from './lib/ai.js';
-import { partsFromUrl, partsFromFiles, SourceError } from './lib/sources.js';
+import { partsFromFiles, SourceError } from './lib/sources.js';
+import { resolveLinkSource } from './lib/resolve.js';
 import { normalizeMenu } from './shared/menu.js';
 
 const PORT = Number(process.env.PORT) || 8890;
@@ -27,6 +28,8 @@ const HEADERS = {
 };
 
 const clip = (v, n) => String(v ?? '').slice(0, n);
+
+const SENT = Symbol('sent');
 
 class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 
@@ -60,7 +63,7 @@ function requireAI() {
   if (!aiAvailable()) throw new HttpError(503, 'No AI key is configured on this server, so only the sample menu and the built-in matcher are available.');
 }
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const MIME = { '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
 async function serveStatic(pathname, res) {
   const prefix = pathname.startsWith('/shared/') ? '/shared/' : '/';
@@ -88,19 +91,31 @@ const routes = {
     rateLimit(req);
     const body = await readJson(req, LIMITS.extract);
     const src = body.source ?? {};
-    const input = src.type === 'url' ? await partsFromUrl(String(src.url ?? '').trim())
-      : src.type === 'files' ? partsFromFiles(src.files)
+    const homeCity = clip(body.homeCity, 80);
+    const input = src.type === 'url' ? await resolveLinkSource({ url: clip(src.url, 2000), text: clip(src.text, 2000) }, { homeCity })
+      : src.type === 'files' ? { ...partsFromFiles(src.files), context: clip(src.context, 300) }
       : (() => { throw new HttpError(400, 'Provide a URL or files.'); })();
     const raw = await extractMenu({
       parts: input.parts,
+      context: input.context,
       translateTo: clip(body.translateTo, 60) || 'English',
       glossLanguages: (Array.isArray(body.glossLanguages) ? body.glossLanguages : []).slice(0, 4).map((g) => clip(g, 30)),
-      homeCity: clip(body.homeCity, 80),
+      homeCity,
     });
     const menu = normalizeMenu({ ...raw, source: { kind: input.kind, label: input.label, url: input.url } });
+    menu.notes.unshift(...(input.notes ?? []));
     if (input.truncated) menu.notes.push('The page was very long; only the first part was read.');
     if (!menu.dishes.length) throw new HttpError(422, menu.notes[0] || 'No dishes found in that source.');
     return menu;
+  },
+
+  // Reached only when the service worker isn't running yet (first visit after
+  // install); the worker normally answers share-target requests itself.
+  'POST /share-target': async (req, res) => {
+    req.resume();
+    res.writeHead(303, { Location: '/?share=retry', ...HEADERS });
+    res.end();
+    return SENT;
   },
 
   'POST /api/recommend': async (req) => {
@@ -135,7 +150,10 @@ const server = createServer(async (req, res) => {
   const { pathname } = new URL(req.url, 'http://x');
   const handler = routes[`${req.method} ${pathname}`];
   try {
-    if (handler) return send(res, 200, await handler(req));
+    if (handler) {
+      const out = await handler(req, res);
+      return out === SENT ? undefined : send(res, 200, out);
+    }
     if (pathname.startsWith('/api/')) return send(res, 404, { error: 'Not found' });
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed');
     return serveStatic(pathname, res);

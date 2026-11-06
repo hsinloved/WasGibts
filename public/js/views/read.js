@@ -7,16 +7,66 @@ import { profileForAI } from '/shared/profile.js';
 import { recommendLocally, screenRestrictions } from '/shared/recommend.js';
 
 const state = {
-  tab: 'url',
-  url: '',
-  files: null,
-  occasion: null,
+  tab: 'photos',
+  pages: [],        // [{ file, url }] photos/screenshots/PDFs waiting to be read
+  link: '',
+  sharedText: '',   // text that came with a share (e.g. place name from Google Maps)
+  occasion: undefined,
   request: '',
-  busy: null,      // string while working
+  busy: null,       // string while working
   error: null,
+  autoStart: false,
   ...session.get(), // menu, recs survive reloads
 };
-const persist = () => session.set({ menu: state.menu, recs: state.recs, occasion: state.occasion, request: state.request, url: state.url });
+const persist = () => session.set({ menu: state.menu, recs: state.recs, occasion: state.occasion, request: state.request, link: state.link });
+
+const PLATFORM_RX = /(lieferando|thuisbezorgd|just-eat|takeaway\.com|wolt\.com|ubereats|deliveroo|foodora|foodpanda)/i;
+const PLATFORM_NAMES = { lieferando: 'Lieferando', thuisbezorgd: 'Thuisbezorgd', 'just-eat': 'Just Eat', 'takeaway.com': 'Takeaway', 'wolt.com': 'Wolt', ubereats: 'Uber Eats', deliveroo: 'Deliveroo', foodora: 'foodora', foodpanda: 'foodpanda' };
+export function linkKind(text) {
+  const t = String(text || '');
+  if (/(maps\.app\.goo\.gl|goo\.gl\/maps|google\.[a-z.]+\/maps|maps\.google\.)/i.test(t)) return { kind: 'maps' };
+  const m = t.match(PLATFORM_RX);
+  if (m) return { kind: 'platform', name: PLATFORM_NAMES[m[1].toLowerCase()] ?? m[1] };
+  return { kind: /https?:\/\//i.test(t) || /\.[a-z]{2,}(\/|$)/i.test(t) ? 'website' : null };
+}
+
+/** Called by the app when the installed PWA receives a share (see /sw.js). */
+export async function receiveShare() {
+  const params = new URLSearchParams(location.search);
+  if (!params.has('share')) return false;
+  history.replaceState(null, '', '/#/');
+  if (params.get('share') !== '1') {
+    state.error = 'That share didn’t come through. Open WasGibts once, then try sharing again.';
+    return true;
+  }
+  try {
+    const cache = await caches.open('wasgibts-share');
+    const metaRes = await cache.match('/__share/meta');
+    if (!metaRes) return true;
+    const meta = await metaRes.json();
+    const files = [];
+    for (const key of meta.files) {
+      const r = await cache.match(key);
+      if (!r) continue;
+      const blob = await r.blob();
+      files.push(new File([blob], decodeURIComponent(r.headers.get('X-Name') || 'page'), { type: blob.type }));
+    }
+    for (const key of await cache.keys()) await cache.delete(key);
+    if (files.length) {
+      state.tab = 'photos';
+      state.pages = files.map((file) => ({ file, url: URL.createObjectURL(file) }));
+    } else {
+      state.tab = 'link';
+      state.sharedText = [meta.title, meta.text].filter(Boolean).join('\n');
+      state.link = meta.url || (state.sharedText.match(/https?:\/\/\S+/)?.[0] ?? '');
+    }
+    state.menu = null; state.recs = null;
+    state.autoStart = Boolean(files.length || state.link);
+  } catch {
+    state.error = 'Couldn’t open what you shared. Try adding it here directly.';
+  }
+  return true;
+}
 
 export function renderRead(root, ctx) {
   const { store } = ctx;
@@ -30,27 +80,72 @@ export function renderRead(root, ctx) {
     h('section.intro', {},
       h('p.eyebrow', {}, 'Read a menu'),
       h('h1.display', {}, 'What’s good here, for you?'),
-      h('p.lede', {}, 'Share a menu and I’ll translate it, explain what each dish actually is, and pick a few that suit your taste and the moment.'),
+      h('p.lede', {}, 'Photograph a menu at the table, paste a Google Maps or delivery link from the office chat, or share screenshots. I’ll translate it, explain each dish, and pick a few for you.'),
     ),
     sourceForm(ctx, rerender),
     state.busy && h('div.working', { role: 'status' }, h('span.dot'), state.busy),
     state.error && h('p.error', { role: 'alert' }, state.error),
     state.menu && !state.busy && results(ctx, rerender),
   );
+  if (state.autoStart && ctx.ai.available) {
+    state.autoStart = false;
+    readMenu(ctx, rerender);
+  }
 }
 
 function sourceForm(ctx, rerender) {
   const { ai } = ctx;
-  const tabs = [['url', 'Website link'], ['file', 'Photo or PDF'], ['sample', 'Sample menu']];
+  const tabs = [['photos', 'Photos & screenshots'], ['link', 'Link'], ['sample', 'Sample menu']];
   const disabled = !ai.available && state.tab !== 'sample';
 
-  const input = state.tab === 'url'
-    ? h('label.field', {}, h('span', {}, 'Restaurant or menu page'),
-      h('input', { type: 'url', inputmode: 'url', placeholder: 'https://…', value: state.url, required: true, oninput: (e) => { state.url = e.target.value; } }))
-    : state.tab === 'file'
-      ? h('label.field', {}, h('span', {}, 'Menu photos (several pages are fine) or a PDF'),
-        h('input', { type: 'file', accept: 'image/*,application/pdf', multiple: true, onchange: (e) => { state.files = e.target.files; } }))
-      : h('p.muted', {}, 'A fictional Sichuan restaurant in Berlin, bundled with the app. Works without an AI key.');
+  const addFiles = (list) => {
+    for (const file of [...list]) {
+      if (state.pages.length >= 8) { toast('Up to 8 pages at a time.'); break; }
+      state.pages.push({ file, url: file.type.startsWith('image/') ? URL.createObjectURL(file) : null });
+    }
+    state.error = null;
+    rerender();
+  };
+
+  let input;
+  if (state.tab === 'photos') {
+    input = h('div.photos', {},
+      h('p.hint.top', {}, 'At the table: photograph each page. From Google Maps or a delivery app: screenshot the menu and add the screenshots.'),
+      state.pages.length > 0 && h('ol.pages', {}, state.pages.map((pg, i) => h('li.page', {},
+        pg.url ? h('img', { src: pg.url, alt: `Page ${i + 1}` }) : h('span.pdf', {}, 'PDF'),
+        h('span.page-n', {}, String(i + 1)),
+        h('button.remove', {
+          type: 'button', 'aria-label': `Remove page ${i + 1}`,
+          onclick: () => { if (pg.url) URL.revokeObjectURL(pg.url); state.pages.splice(i, 1); rerender(); },
+        }, '×')))),
+      h('div.actions', {},
+        h('label.button', {}, state.pages.length ? 'Take another photo' : 'Take a photo',
+          h('input.visually-hidden', { type: 'file', accept: 'image/*', capture: 'environment', onchange: (e) => addFiles(e.target.files) })),
+        h('label.button.ghost', {}, 'Choose photos, screenshots or a PDF',
+          h('input.visually-hidden', { type: 'file', accept: 'image/*,application/pdf', multiple: true, onchange: (e) => addFiles(e.target.files) }))),
+    );
+  } else if (state.tab === 'link') {
+    const k = linkKind(state.link);
+    const hint = {
+      maps: 'Google Maps link — I’ll find this restaurant’s own menu online. If I can’t, screenshots of its menu photos always work.',
+      platform: `${k.name} — I’ll try to read it. If ${k.name} blocks me, I’ll look for the restaurant’s own menu and tell you.`,
+      website: 'Restaurant website or PDF menu.',
+    }[k.kind] ?? 'A restaurant website, a Google Maps link, or a Lieferando, Wolt or Uber Eats page.';
+    input = h('label.field', {}, h('span', {}, 'Link'),
+      h('input', {
+        type: 'text', inputmode: 'url', autocomplete: 'off', placeholder: 'https://maps.app.goo.gl/… · lieferando.de/… · restaurant.de/speisekarte',
+        value: state.link,
+        oninput: (e) => {
+          const before = linkKind(state.link).kind;
+          state.link = e.target.value; state.sharedText = '';
+          if (linkKind(state.link).kind !== before) { rerender(); document.querySelector('.source input[type=text]')?.focus(); }
+        },
+      }),
+      h('span.hint', {}, hint),
+      state.sharedText && h('span.hint', {}, `Shared: ${state.sharedText.split('\n')[0]}`));
+  } else {
+    input = h('p.muted', {}, 'A fictional Sichuan restaurant in Berlin, bundled with the app. Works without an AI key.');
+  }
 
   return h('form.source', {
     onsubmit: async (e) => { e.preventDefault(); await readMenu(ctx, rerender); },
@@ -72,7 +167,7 @@ function sourceForm(ctx, rerender) {
     h('input', { type: 'text', maxlength: 300, placeholder: 'e.g. something light, no noodles, I’m starving', value: state.request, oninput: (e) => { state.request = e.target.value; } })),
   h('div.actions', {},
     h('button.primary', { type: 'submit', disabled: Boolean(state.busy) || disabled }, state.tab === 'sample' ? 'Open the sample menu' : 'Read the menu'),
-    state.menu && h('button.ghost', { type: 'button', disabled: Boolean(state.busy), onclick: () => refreshPicks(ctx, rerender) }, 'Update picks for this occasion'),
+    state.menu && h('button.ghost', { type: 'button', disabled: Boolean(state.busy), onclick: () => refreshPicks(ctx, rerender) }, 'Update picks'),
   ),
   disabled && h('p.ai-note.muted', {}, 'Reading real menus needs an AI key on the server (ANTHROPIC_API_KEY). The sample menu and the built-in matcher work without one.'),
   );
@@ -86,15 +181,20 @@ async function readMenu(ctx, rerender) {
     } else {
       const { translateTo, glossLanguages, homeCity } = ctx.store.profile.settings;
       let source;
-      if (state.tab === 'url') {
-        if (!state.url.trim()) throw new Error('Paste a link first.');
-        source = { type: 'url', url: state.url.trim() };
-        state.busy = 'Fetching the page and reading the menu…';
+      if (state.tab === 'link') {
+        const text = [state.sharedText, state.link].filter(Boolean).join('\n').trim();
+        const url = text.match(/https?:\/\/\S+/)?.[0] ?? (state.link.trim() ? `https://${state.link.trim().replace(/^\/+/, '')}` : '');
+        if (!url) throw new Error('Paste a link first.');
+        source = { type: 'url', url, text };
+        state.busy = {
+          maps: 'Finding this restaurant’s menu online… this can take half a minute.',
+          platform: 'Reading the delivery menu…',
+        }[linkKind(text).kind] ?? 'Fetching the page and reading the menu…';
       } else {
-        if (!state.files?.length) throw new Error('Choose a photo or PDF first.');
-        state.busy = 'Preparing your files…'; rerender();
-        source = { type: 'files', files: await readFiles(state.files) };
-        state.busy = `Reading ${plural(state.files.length, 'page')}…`;
+        if (!state.pages.length) throw new Error('Take a photo or add a screenshot first.');
+        state.busy = 'Preparing your pages…'; rerender();
+        source = { type: 'files', files: await readFiles(state.pages.map((p) => p.file)) };
+        state.busy = `Reading ${plural(state.pages.length, 'page')}…`;
       }
       rerender();
       state.menu = normalizeMenu(await api.extract(source, { translateTo, glossLanguages, homeCity }));
@@ -176,6 +276,8 @@ function results(ctx, rerender) {
         h('p.small.muted', {}, 'Menus rarely list everything. For allergies, always ask the restaurant.'),
       ),
     ),
+
+    h('section.order-tray', { id: 'order-tray' }, orderTray(ctx)),
 
     h('section.full-menu', {},
       h('h2.section-title', {}, 'The whole menu'),
@@ -259,10 +361,11 @@ function dishActions(ctx, d, recommended) {
     });
     e.target.disabled = true;
     e.target.textContent = action === 'ordered' ? 'Ordered ✓' : 'Saved ✓';
-    toast(action === 'ordered' ? 'In your journal. Tell me how it was afterwards.' : 'Saved to your journal.', { href: '#/journal', label: 'Open journal' });
+    refreshTray(ctx);
+    toast(action === 'ordered' ? 'Added to your order. Tell me how it was afterwards.' : 'Saved to your journal.', { href: '#/journal', label: 'Open journal' });
   };
   return h('div.dish-actions', {},
-    h('button.small', { type: 'button', disabled: inJournal('ordered'), onclick: (e) => add('ordered', e) }, inJournal('ordered') ? 'Ordered ✓' : 'I’m ordering this'),
+    h('button.small', { type: 'button', disabled: inJournal('ordered'), dataset: { order: d.originalName }, onclick: (e) => add('ordered', e) }, inJournal('ordered') ? 'Ordered ✓' : 'I’m ordering this'),
     h('button.small.ghost', { type: 'button', disabled: inJournal('saved'), onclick: (e) => add('saved', e) }, inJournal('saved') ? 'Saved ✓' : 'Save for later'),
   );
 }
@@ -271,4 +374,86 @@ function groupBy(list, fn) {
   const m = new Map();
   for (const x of list) { const k = fn(x); m.set(k, [...(m.get(k) ?? []), x]); }
   return m;
+}
+
+// --- Your order: show to staff, copy for chat -------------------------------------
+
+function currentOrder(store) {
+  if (!state.menu) return [];
+  const byName = new Map(state.menu.dishes.map((d) => [d.originalName, d]));
+  return store.profile.history
+    .filter((x) => x.action === 'ordered' && !x.feedbackAt && x.restaurant.name === (state.menu.restaurant.name ?? null)
+      && byName.has(x.dish.originalName) && Date.now() - Date.parse(x.at) < 12 * 3600e3)
+    .reverse()
+    .map((entry) => ({ entry, dish: byName.get(entry.dish.originalName) }));
+}
+
+function refreshTray(ctx) {
+  const el = document.getElementById('order-tray');
+  if (el) mount(el, orderTray(ctx));
+}
+
+function orderTotal(items) {
+  const amounts = items.map((i) => i.dish.price);
+  if (!amounts.length || amounts.some((p) => p.amount == null)) return null;
+  const currencies = new Set(amounts.map((p) => p.currency));
+  if (currencies.size > 1) return null;
+  const sum = amounts.reduce((s, p) => s + p.amount, 0);
+  const cur = [...currencies][0];
+  return cur === 'EUR' ? `${sum.toFixed(2).replace('.', ',')} €` : `${sum.toFixed(2)}${cur ? ` ${cur}` : ''}`;
+}
+
+export function orderText(menu, items) {
+  const lines = items.map(({ dish }) => {
+    const names = [dish.originalName, dish.glosses?.find((g) => /english/i.test(g.language))?.name ?? null].filter(Boolean);
+    const price = priceLabel(dish);
+    return `• ${names.join(' — ')}${price ? ` (${price})` : ''}`;
+  });
+  const total = orderTotal(items);
+  return [`${menu.restaurant.name ?? 'Order'}:`, ...lines, total ? `Total: ${total}` : null].filter(Boolean).join('\n');
+}
+
+function orderTray(ctx) {
+  const items = currentOrder(ctx.store);
+  if (!items.length) return null;
+  const total = orderTotal(items);
+  return h('div.tray', {},
+    h('div.block-head', {}, h('h2.section-title', {}, 'Your order'), total && h('span.price', {}, total)),
+    h('ul.tray-list', {}, items.map(({ entry, dish }) => h('li', {},
+      h('span', {}, h('strong', {}, dish.originalName), dish.translatedName && h('span.muted', {}, ` · ${dish.translatedName}`)),
+      h('span.tray-right', {}, priceLabel(dish) ?? '', h('button.small.ghost', {
+        type: 'button', 'aria-label': `Remove ${dish.originalName}`,
+        onclick: async () => {
+          await ctx.store.do('removeHistory', entry.id);
+          const btn = [...document.querySelectorAll('[data-order]')].filter((b) => b.dataset.order === dish.originalName);
+          btn.forEach((b) => { b.disabled = false; b.textContent = 'I’m ordering this'; });
+          refreshTray(ctx);
+        },
+      }, 'Remove'))))),
+    h('div.actions', {},
+      h('button.small.primary', { type: 'button', onclick: () => showToStaff(items) }, 'Show to staff'),
+      h('button.small', {
+        type: 'button',
+        onclick: async () => {
+          const text = orderText(state.menu, items);
+          try { await navigator.clipboard.writeText(text); toast('Copied — paste it into the chat.'); } catch { prompt('Copy your order:', text); }
+        },
+      }, 'Copy for chat')),
+  );
+}
+
+function showToStaff(items) {
+  const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const overlay = h('div.staff', { role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Order to show staff' },
+    h('p.eyebrow', {}, state.menu.restaurant.name ?? ''),
+    h('ol.staff-list', {}, items.map(({ dish }) => h('li', {},
+      h('span.staff-name', {}, dish.originalName),
+      dish.section && h('span.staff-sub', {}, dish.section),
+      priceLabel(dish) && h('span.staff-sub', {}, priceLabel(dish))))),
+    h('button.staff-close', { type: 'button', onclick: close }, 'Done'),
+  );
+  document.addEventListener('keydown', onKey);
+  document.body.append(overlay);
+  overlay.querySelector('.staff-close').focus();
 }

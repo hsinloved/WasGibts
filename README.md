@@ -8,6 +8,16 @@ It is not a calorie tracker and not a restaurant finder. Its job is to read a me
 - **Facts are kept apart from assumptions.** Ingredients printed on the menu are shown plainly. Typical ingredients are shown in italics. Prices are never estimated, and there are no generated images or nutrition figures.
 - **It learns only from feedback.** "I loved this", "Too rich", "I wanted more vegetables", "I'd order it again", "Not today"… Patterns stay suggestions until you confirm them.
 
+## Three ways in
+
+| situation | what to do | what happens |
+|---|---|---|
+| **At the restaurant** | *Photos & screenshots* → **Take a photo** for each page | Pages are read together. Add dishes to **Your order**, then use **Show to staff** for a full-screen list of original dish names to point at. |
+| **Office: a Google Maps link in the chat** | Paste it under *Link*, or on Android **Share → WasGibts** from Google Maps | The place name and location are taken from the link, the restaurant's own menu (website or PDF) is found with web search and read. If none is found, it tells you to screenshot the menu photos in Maps, which always works. **Copy for chat** gives a ready-to-paste order with prices and total. |
+| **Ordering online** (Lieferando, Wolt, Uber Eats, Deliveroo, foodora…) | Paste or share the restaurant's page, or screenshots from the app | It tries the platform page, including the menu data the page embeds. If the platform blocks it, it reads the restaurant's own menu instead and warns that platform prices may differ. Screenshots always work. Pick *Office delivery* or *Delivery at home* so it favours dishes that travel well. |
+
+**Install it** (Android Chrome: menu → *Install app*; iPhone Safari: Share → *Add to Home Screen*) to get a home-screen icon. On Android the installed app also appears in the system **Share** sheet for links and screenshots. iOS does not let web apps receive shares, so on iPhone use copy-paste or *Choose photos* instead. Installing requires the app to be served over HTTPS.
+
 See [docs/DATA_MODEL.md](docs/DATA_MODEL.md) for the data model, inference rules and user flows.
 
 ## Run
@@ -71,6 +81,8 @@ To add accounts later, add a `RemoteRepository` and `/api/profile` routes. See t
 ## Limitations (MVP)
 
 - Websites that render their menu with JavaScript, or show it only as images, yield little text. The app then suggests uploading a photo or the PDF instead.
+- Google Maps menu photos can't be read from a link (Google offers no open access to them). The app searches for the restaurant's own menu instead, using Claude's web search tool, which must be enabled for your Anthropic organization. Menus found this way may be out of date.
+- Delivery platforms often block automated reading, and their page formats change. Expect screenshots to be the dependable route there.
 - Photos are downscaled in the browser to 2000 px. HEIC files may need converting first.
 - The URL fetcher checks the resolved address before connecting but does not pin it, so DNS-rebinding protection is basic. Put it behind an egress proxy if you expose it publicly.
 - Allergy handling is advisory. Menus are incomplete, and the app says so wherever it matters.

@@ -1,6 +1,6 @@
 import { createStore } from './store.js';
 import { api } from './api.js';
-import { renderRead } from './views/read.js';
+import { renderRead, receiveShare } from './views/read.js';
 import { renderJournal } from './views/journal.js';
 import { renderProfile } from './views/profile.js';
 
@@ -9,6 +9,8 @@ const views = { '': renderRead, journal: renderJournal, profile: renderProfile }
 async function main() {
   const store = createStore();
   const [, ai] = await Promise.all([store.init(), api.status()]);
+  await receiveShare(); // a link or screenshots shared into the installed app
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
   const ctx = { store, ai };
   const root = document.getElementById('view');
 

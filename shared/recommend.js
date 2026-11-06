@@ -14,6 +14,7 @@ const OCCASION_RULES = {
   solo: { plus: [], minus: [] },
   sharing: { plus: ['shareable'], minus: ['soup', 'messy'] },
   office: { plus: ['travels-well'], minus: ['soup', 'raw', 'fried', 'messy'] },
+  delivery: { plus: ['travels-well'], minus: ['fried', 'raw'] },
   adventurous: { plus: ['unusual', 'fermented'], minus: [] },
   quick: { plus: ['quick', 'light'], minus: ['filling', 'rich', 'braised'] },
 };

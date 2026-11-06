@@ -284,3 +284,30 @@ details.quiet { margin-top: 1rem; }
 .ask .chip { background: var(--paper); }
 .guidance-list { list-style: none; padding: 0; margin: 0 0 1rem; }
 .guidance-list li { display: flex; gap: 1rem; justify-content: space-between; align-items: baseline; padding: .6rem 0; border-bottom: 1px solid var(--rule); font-size: 1rem; }
+
+/* --- Photos, order tray, staff view ------------------------------------------- */
+.hint.top { margin: 0; }
+.photos { display: grid; gap: 1rem; }
+.pages { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr)); gap: .6rem; }
+.page { position: relative; aspect-ratio: 3 / 4; border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; background: var(--paper-2); }
+.page img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.page .pdf { display: grid; place-items: center; height: 100%; font: 600 .8rem var(--sans); color: var(--muted); }
+.page-n { position: absolute; left: .3rem; bottom: .3rem; font: 600 .7rem/1 var(--sans); background: var(--ink); color: var(--paper); padding: .2rem .35rem; border-radius: 2px; }
+.page .remove { position: absolute; top: .25rem; right: .25rem; padding: .15rem .45rem; font-size: 1rem; line-height: 1; background: var(--paper); border-color: var(--rule); border-radius: 2rem; }
+label.button { position: relative; }
+.order-tray:empty { display: none; }
+.tray { max-width: var(--measure); margin: 3rem 0 0; padding: 1.25rem; border: 1px solid var(--ink); border-radius: var(--radius); }
+.tray-list { list-style: none; padding: 0; margin: .5rem 0 1rem; font: .95rem/1.4 var(--sans); }
+.tray-list li { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: .5rem 0; border-bottom: 1px solid var(--rule); }
+.tray-list strong { font-weight: 600; }
+.tray-right { display: flex; gap: .75rem; align-items: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.staff {
+  position: fixed; inset: 0; z-index: 30; background: var(--paper); color: var(--ink);
+  padding: max(2rem, env(safe-area-inset-top)) 1.25rem 2rem; overflow-y: auto; display: flex; flex-direction: column;
+}
+.staff-list { list-style: none; counter-reset: n; padding: 0; margin: 1rem 0 2rem; flex: 1; }
+.staff-list li { counter-increment: n; padding: 1.1rem 0; border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; gap: .3rem; }
+.staff-list li::before { content: counter(n); font: 500 1rem var(--sans); color: var(--accent); }
+.staff-name { font: 500 clamp(1.9rem, 8vw, 3rem)/1.15 var(--serif); }
+.staff-sub { font: .95rem var(--sans); color: var(--muted); }
+.staff-close { align-self: stretch; justify-content: center; padding: 1rem; font-size: 1rem; background: var(--ink); color: var(--paper); }
