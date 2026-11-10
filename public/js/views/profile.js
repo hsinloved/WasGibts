@@ -65,6 +65,18 @@ function section(title, blurb, list, ctx, rerender, defaults) {
   );
 }
 
+/**
+ * Confidence as a ruled line against the 0.70 ceiling that unconfirmed
+ * patterns can never pass. Width comes from a 5% bucket class: the CSP forbids
+ * inline styles.
+ */
+function confidenceMeter(pref) {
+  const bucket = Math.round(Math.min(1, Math.max(0, pref.confidence)) * 20) * 5;
+  const kind = pref.origin === 'inferred' && pref.status === 'suggested' ? 'unconfirmed' : 'confirmed';
+  return h(`span.meter.${kind}`, { role: 'img', 'aria-label': `Confidence: ${confidenceLabel(pref.confidence)}` },
+    h(`span.meter-fill.w${bucket}`), h('span.meter-ceiling', { title: 'Ceiling for unconfirmed patterns' }));
+}
+
 function prefRow(pref, ctx, rerender) {
   const { store } = ctx;
   if (ui.editing === pref.id) {
@@ -82,6 +94,7 @@ function prefRow(pref, ctx, rerender) {
     h('div.pref-main', {},
       h('span.pref-subject', {}, pref.subject),
       h('span.pref-meta', {}, [pref.category, origin, ...pref.contexts.map((c) => `only ${OCCASIONS[c].label.toLowerCase()}`)].join(' · ')),
+      pref.status !== 'dismissed' && confidenceMeter(pref),
       pref.note && h('p.pref-note', {}, pref.note),
     ),
     h('div.pref-actions', {},

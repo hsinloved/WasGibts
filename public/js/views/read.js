@@ -133,7 +133,7 @@ function sourceForm(ctx, rerender) {
     }[k.kind] ?? 'A restaurant website, a Google Maps link, or a Lieferando, Wolt or Uber Eats page.';
     input = h('label.field', {}, h('span', {}, 'Link'),
       h('input', {
-        type: 'text', inputmode: 'url', autocomplete: 'off', placeholder: 'https://maps.app.goo.gl/… · lieferando.de/… · restaurant.de/speisekarte',
+        type: 'text', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'go', placeholder: 'Paste a link',
         value: state.link,
         oninput: (e) => {
           const before = linkKind(state.link).kind;
@@ -164,7 +164,7 @@ function sourceForm(ctx, rerender) {
     h('p.hint', {}, OCCASIONS[state.occasion]?.blurb ?? 'Not set — I’ll ask if it changes what I’d pick.'),
   ),
   h('label.field', {}, h('span', {}, 'Anything in particular today? ', h('em', {}, 'optional, not saved to your profile')),
-    h('input', { type: 'text', maxlength: 300, placeholder: 'e.g. something light, no noodles, I’m starving', value: state.request, oninput: (e) => { state.request = e.target.value; } })),
+    h('input', { type: 'text', maxlength: 300, enterkeyhint: 'go', placeholder: 'e.g. something light, no noodles', value: state.request, oninput: (e) => { state.request = e.target.value; } })),
   h('div.actions', {},
     h('button.primary', { type: 'submit', disabled: Boolean(state.busy) || disabled }, state.tab === 'sample' ? 'Open the sample menu' : 'Read the menu'),
     state.menu && h('button.ghost', { type: 'button', disabled: Boolean(state.busy), onclick: () => refreshPicks(ctx, rerender) }, 'Update picks'),
@@ -301,7 +301,7 @@ function results(ctx, rerender) {
 
 function pickCard(ctx, d, p, i) {
   return h('li.pick', {},
-    h('div.pick-num', { 'aria-hidden': 'true' }, String(i + 1).padStart(2, '0')),
+    h('div.pick-num', { 'aria-hidden': 'true' }, h('span', {}, String(i + 1))),
     h('article', {},
       h('p.eyebrow.accent', {}, p.role),
       h('header.dish-head', {},
@@ -343,7 +343,7 @@ export function dishDetail(d) {
       d.dietary.menuStated.length && d.dietary.likely.length ? '; ' : '',
       d.dietary.likely.length ? h('span.typical', {}, `probably: ${d.dietary.likely.join(', ')}`) : '') : null,
     d.uncertainty && h('p.facts.unsure', {}, h('span.label', {}, 'Not sure'), ' ', d.uncertainty),
-    hasTypical && h('p.legend', {}, h('span.typical', {}, 'Italic'), ' = typical for this dish, not stated on the menu.'),
+    hasTypical && h('p.legend', {}, h('span.stated', {}, 'stated on the menu'), h('span.typical', {}, 'typical for this dish, not on the menu')),
     d.culturalNote && h('aside.culture', {}, d.culturalNote),
   );
 }
@@ -351,7 +351,7 @@ export function dishDetail(d) {
 function provenanceList(items, key) {
   return items.flatMap((x, i) => [
     i ? ', ' : '',
-    x.source === 'menu' ? h('span', {}, x[key]) : h('span.typical', { title: 'Typical for this dish; not on the menu' }, x[key]),
+    x.source === 'menu' ? h('span.stated', { title: 'Stated on the menu' }, x[key]) : h('span.typical', { title: 'Typical for this dish; not on the menu' }, x[key]),
   ]);
 }
 
@@ -448,7 +448,8 @@ function orderTray(ctx) {
 }
 
 function showToStaff(items) {
-  const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const opener = document.activeElement;
+  const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; opener?.focus?.(); };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
   const overlay = h('div.staff', { role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Order to show staff' },
     h('p.eyebrow', {}, state.menu.restaurant.name ?? ''),
@@ -459,6 +460,7 @@ function showToStaff(items) {
     h('button.staff-close', { type: 'button', onclick: close }, 'Done'),
   );
   document.addEventListener('keydown', onKey);
+  document.body.style.overflow = 'hidden'; // the page behind must not scroll under a thumb
   document.body.append(overlay);
   overlay.querySelector('.staff-close').focus();
 }
