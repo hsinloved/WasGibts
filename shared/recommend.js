@@ -35,12 +35,16 @@ const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const has = (text, w) => new RegExp(`(^|[^\\p{L}-])${escape(w)}(s|es)?(?![\\p{L}-])`, 'u').test(text);
 
 /** Does this preference's subject show up in the dish? Returns the matched words. */
-export function matches(subject, text, attributes = []) {
+// Specific things (a dish, an ingredient, a cuisine) must be named; only broad
+// descriptions ("rich, heavy dishes", "spicy food") may match a dish's labels.
+const SPECIFIC = new Set(['dish', 'ingredient', 'cuisine']);
+
+export function matches(subject, text, attributes = [], category = null) {
   const key = subjectKey(subject);
   if (!key) return null;
   if (has(text, key)) return key;
   // Phrases from feedback ("rich, heavy dishes") match on attribute words.
-  const attr = attributes.find((a) => key.split(/[^a-z-]+/).includes(a));
+  const attr = SPECIFIC.has(category) ? null : attributes.find((a) => key.split(/[^a-z-]+/).includes(a));
   if (attr) return attr;
   // Multi-word subjects: every significant word must appear.
   const ws = words(key);
@@ -106,7 +110,7 @@ export function recommendLocally(menu, profile, context = {}) {
   // says something about the restaurant, not about which dish to pick.
   const texts = new Map(menu.dishes.map((d) => [d.id, { all: dishText(d), menu: menuText(d) }]));
   const broad = new Set(prefs.filter((p) => menu.dishes.length >= 4
-    && menu.dishes.filter((d) => matches(p.subject, texts.get(d.id).all, d.attributes)).length / menu.dishes.length > 0.6).map((p) => p.id));
+    && menu.dishes.filter((d) => matches(p.subject, texts.get(d.id).all, d.attributes, p.category)).length / menu.dishes.length > 0.6).map((p) => p.id));
 
   const scored = menu.dishes.map((d) => {
     const { all: text, menu: verifiedText } = texts.get(d.id);
@@ -116,9 +120,9 @@ export function recommendLocally(menu, profile, context = {}) {
 
     for (const p of prefs) {
       if (broad.has(p.id)) continue;
-      const hit = matches(p.subject, text, d.attributes);
+      const hit = matches(p.subject, text, d.attributes, p.category);
       if (!hit) continue;
-      const onMenu = Boolean(matches(p.subject, verifiedText, d.attributes));
+      const onMenu = Boolean(matches(p.subject, verifiedText, d.attributes, p.category));
       const w = (p.origin === 'explicit' ? 1 : 0.6) * (0.4 + p.confidence) * (onMenu ? 1 : 0.6);
       const how = p.origin === 'explicit' ? 'you told me' : p.status === 'active' ? 'you confirmed'
         : isUnverifiedPrior(p) ? 'you listed this as likely; not confirmed yet' : `a pattern from your feedback, ${confidenceLabel(p.confidence)}`;
