@@ -1,19 +1,24 @@
-/* WasGibts — editorial, typography-led. One serif for reading, one sans for
-   interface, one restrained accent. */
+/* WasGibts — "Quiet Provenance". A field notebook: warm paper, iron-gall ink,
+   one earthen accent that marks only choices. Newsreader for reading,
+   Instrument Serif italic for the few large gestures, DM Mono for clinical
+   labels, Inter for running interface text. See docs/DESIGN.md. */
 
 :root {
-  --paper: #f6f2ea;
-  --paper-2: #efe9dd;
-  --ink: #1d1b18;
-  --ink-2: #4a4640;
-  --muted: #7a746a;
-  --rule: #d9d1c2;
-  --accent: #9c3b23;       /* paprika, used sparingly */
-  --accent-soft: #f1e1d8;
+  --paper: #f1ece2;
+  --paper-2: #e9e3d6;
+  --ink: #22201e;
+  --ink-2: #4a4641;
+  --muted: #77716a;
+  --rule: #d6cebf;
+  --accent: #a84b31;       /* terracotta: marks a choice, never fills a field */
+  --accent-soft: #efe0d6;
   --positive: #3f6b4a;
   --negative: #8a4b2a;
   --serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
   --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: 'Instrument Serif', 'Newsreader', Georgia, serif;
+  --mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --grain-opacity: .05;
   --measure: 42rem;
   --wide: 60rem;
   --radius: 4px;
@@ -24,13 +29,13 @@
   :root:not([data-theme="light"]) {
     --paper: #161513; --paper-2: #1f1d1a; --ink: #ece6da; --ink-2: #c9c2b5; --muted: #948c7f;
     --rule: #34302a; --accent: #e08a6d; --accent-soft: #2e211b; --positive: #8fbf98; --negative: #e0a07a;
-    color-scheme: dark;
+    --grain-opacity: .07; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --paper: #161513; --paper-2: #1f1d1a; --ink: #ece6da; --ink-2: #c9c2b5; --muted: #948c7f;
   --rule: #34302a; --accent: #e08a6d; --accent-soft: #2e211b; --positive: #8fbf98; --negative: #e0a07a;
-  color-scheme: dark;
+  --grain-opacity: .07; color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -311,3 +316,114 @@ label.button { position: relative; }
 .staff-name { font: 500 clamp(1.9rem, 8vw, 3rem)/1.15 var(--serif); }
 .staff-sub { font: .95rem var(--sans); color: var(--muted); }
 .staff-close { align-self: stretch; justify-content: center; padding: 1rem; font-size: 1rem; background: var(--ink); color: var(--paper); }
+
+/* =============================================================================
+   Quiet Provenance layer — the visual language of the poster in design/.
+   Solid mark = observed (on the menu); hollow mark = assumed (typical).
+   One dashed threshold at 0.70: the ceiling of the unconfirmed.
+   ============================================================================= */
+
+/* Paper grain: an even, handled-sheet texture, never a filter. */
+body { position: relative; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.masthead, main, .colophon { position: relative; z-index: 1; }
+
+/* Masthead: the wordmark is the one large italic gesture; everything else is a label. */
+.masthead { border-bottom: 1px solid var(--ink); padding-bottom: .9rem; }
+.wordmark { font: italic 400 2.1rem/1 var(--display); letter-spacing: -.01em; color: var(--ink); }
+nav { font: 400 .74rem/1 var(--mono); letter-spacing: .08em; }
+nav a[aria-current="true"] { border-bottom-color: var(--accent); }
+.count:not(:empty) { font-family: var(--mono); border-radius: 0; background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+
+/* Display type: Instrument Serif italic, used rarely and large. */
+.display, .display-s { font-family: var(--display); font-style: italic; font-weight: 400; letter-spacing: -.01em; }
+.display { font-size: clamp(2.6rem, 7.5vw, 4.4rem); line-height: 1; }
+.headline { font-family: var(--display); font-style: italic; font-size: 1.75rem; line-height: 1.2; }
+
+/* Clinical labels in mono. */
+.eyebrow, .label, .tag, .badge, .optional, .menu-section-title, .concerns h4, .cautions h3, .proposal h3,
+.field > span, legend, .engine, .entry-meta, .pref-meta, .date, .price, .page-n, .glosses {
+  font-family: var(--mono); font-weight: 400;
+}
+.eyebrow, .label, .tag, .badge, .menu-section-title, .concerns h4, .cautions h3, .proposal h3 { letter-spacing: .1em; }
+.field > span, legend { letter-spacing: .06em; font-size: .72rem; }
+.price { font-size: .85rem; }
+.badge, .optional { border-radius: 0; }
+
+/* Buttons and chips: ruled, square, mono. The accent appears only when choosing. */
+button, .button { font-family: var(--mono); font-weight: 400; font-size: .8rem; letter-spacing: .04em; border-radius: 0; }
+button.small, .button.small { font-size: .74rem; }
+.chip { font-family: var(--mono); font-weight: 400; font-size: .76rem; letter-spacing: .03em; border-radius: 0; }
+.chip.on { background: transparent; color: var(--accent); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.feedback .chip.on, .feedback .chip.positive.on, .feedback .chip.negative.on { background: var(--paper); }
+.chip.positive.on { color: var(--positive); border-color: var(--positive); box-shadow: inset 0 0 0 1px var(--positive); background: transparent; }
+.chip.negative.on { color: var(--negative); border-color: var(--negative); box-shadow: inset 0 0 0 1px var(--negative); background: transparent; }
+.tabs button { font-family: var(--mono); font-weight: 400; font-size: .8rem; letter-spacing: .04em; }
+textarea, .concerns, .feedback, .pref-form, .proposal, .cautions, .tray, .page, .callout, .ask, #toast { border-radius: 0; }
+
+/* Picks: numbered by a hollow terracotta circle, like the chosen marks on the plate. */
+.pick-num { font: 400 1rem/1 var(--mono); color: var(--accent); }
+.pick-num span {
+  display: inline-grid; place-items: center; width: 2.6rem; height: 2.6rem;
+  border: 1.5px solid var(--accent); border-radius: 50%;
+}
+.pick { border-top-color: var(--rule); }
+.pick-list > .pick:first-child { border-top-color: var(--ink); }
+.dish-row[open] summary .orig { color: var(--ink); }
+.dish-row[open] summary .orig::before { content: '●'; color: var(--accent); font-size: .55em; vertical-align: .35em; margin-right: .5em; }
+
+/* Provenance marks: ● stated on the menu, ○ typical. */
+.stated::before, .typical::before {
+  content: ''; display: inline-block; width: .5em; height: .5em; border-radius: 50%;
+  margin-right: .35em; vertical-align: .08em; box-sizing: border-box;
+}
+.stated::before { background: currentColor; }
+.typical::before { border: 1px solid currentColor; }
+.legend { display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; font-family: var(--mono); font-size: .7rem; letter-spacing: .02em; }
+.legend .typical { font-style: normal; }
+
+/* Confidence: a ruled line against the dashed 0.70 ceiling. */
+.meter { position: relative; display: block; width: min(14rem, 100%); height: .7rem; margin: .45rem 0 .1rem; }
+.meter::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dotted var(--rule); }
+.meter-fill { position: absolute; left: 0; top: 50%; height: 0; border-top: 1.5px solid var(--ink-2); }
+.meter-fill::after { content: ''; position: absolute; right: 0; top: -5px; height: 9px; border-right: 1.5px solid var(--ink-2); }
+.meter.confirmed .meter-fill, .meter.confirmed .meter-fill::after { border-color: var(--ink); }
+.meter-ceiling { position: absolute; left: 70%; top: -2px; bottom: -2px; border-left: 1px dashed var(--ink); }
+.meter-fill.w0 { width: 0%; }
+.meter-fill.w5 { width: 5%; }
+.meter-fill.w10 { width: 10%; }
+.meter-fill.w15 { width: 15%; }
+.meter-fill.w20 { width: 20%; }
+.meter-fill.w25 { width: 25%; }
+.meter-fill.w30 { width: 30%; }
+.meter-fill.w35 { width: 35%; }
+.meter-fill.w40 { width: 40%; }
+.meter-fill.w45 { width: 45%; }
+.meter-fill.w50 { width: 50%; }
+.meter-fill.w55 { width: 55%; }
+.meter-fill.w60 { width: 60%; }
+.meter-fill.w65 { width: 65%; }
+.meter-fill.w70 { width: 70%; }
+.meter-fill.w75 { width: 75%; }
+.meter-fill.w80 { width: 80%; }
+.meter-fill.w85 { width: 85%; }
+.meter-fill.w90 { width: 90%; }
+.meter-fill.w95 { width: 95%; }
+.meter-fill.w100 { width: 100%; }
+
+/* Colophon: whisper-thin labels. */
+.colophon { border-top: 1px solid var(--ink); }
+.colophon-mark {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1rem; margin: 1.5rem 0 0;
+  font: 400 .7rem/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+
+/* Staff view keeps its large original names, set in the display face. */
+.staff-name { font-family: var(--display); font-style: normal; }
+.staff-list li::before { font-family: var(--mono); }
+
+/* The accent never fills a field: primary hover deepens the ink instead. */
+button.primary:hover { background: var(--ink-2); border-color: var(--ink-2); }

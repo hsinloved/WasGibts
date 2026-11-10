@@ -8,18 +8,19 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <meta name="theme-color" content="#1d1b18">
+  <meta name="theme-color" content="#f1ece2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#161513" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="/styles.css">
   <script type="module" src="/js/app.js"></script>
 </head>
 <body>
   <a class="skip" href="#view">Skip to content</a>
   <header class="masthead">
-    <a class="wordmark" href="#/">Was<em>Gibts?</em></a>
+    <a class="wordmark" href="#/">Was gibts?</a>
     <nav aria-label="Main">
       <a href="#/">Read a menu</a>
       <a href="#/journal">Journal <span id="journal-count" class="count" aria-label="dishes awaiting feedback"></span></a>
@@ -29,6 +30,7 @@
   <main id="view" tabindex="-1"><p class="muted">Loading…</p></main>
   <footer class="colophon">
     <p>Your profile is stored in this browser. Recommendations are suggestions — for allergies, always ask the restaurant.</p>
+    <p class="colophon-mark"><span>Only feedback teaches</span><span aria-hidden="true">● stated · ○ typical</span></p>
   </footer>
   <div id="toast" role="status" aria-live="polite"></div>
 </body>

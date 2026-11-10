@@ -301,7 +301,7 @@ function results(ctx, rerender) {
 
 function pickCard(ctx, d, p, i) {
   return h('li.pick', {},
-    h('div.pick-num', { 'aria-hidden': 'true' }, String(i + 1).padStart(2, '0')),
+    h('div.pick-num', { 'aria-hidden': 'true' }, h('span', {}, String(i + 1))),
     h('article', {},
       h('p.eyebrow.accent', {}, p.role),
       h('header.dish-head', {},
@@ -343,7 +343,7 @@ export function dishDetail(d) {
       d.dietary.menuStated.length && d.dietary.likely.length ? '; ' : '',
       d.dietary.likely.length ? h('span.typical', {}, `probably: ${d.dietary.likely.join(', ')}`) : '') : null,
     d.uncertainty && h('p.facts.unsure', {}, h('span.label', {}, 'Not sure'), ' ', d.uncertainty),
-    hasTypical && h('p.legend', {}, h('span.typical', {}, 'Italic'), ' = typical for this dish, not stated on the menu.'),
+    hasTypical && h('p.legend', {}, h('span.stated', {}, 'stated on the menu'), h('span.typical', {}, 'typical for this dish, not on the menu')),
     d.culturalNote && h('aside.culture', {}, d.culturalNote),
   );
 }
@@ -351,7 +351,7 @@ export function dishDetail(d) {
 function provenanceList(items, key) {
   return items.flatMap((x, i) => [
     i ? ', ' : '',
-    x.source === 'menu' ? h('span', {}, x[key]) : h('span.typical', { title: 'Typical for this dish; not on the menu' }, x[key]),
+    x.source === 'menu' ? h('span.stated', { title: 'Stated on the menu' }, x[key]) : h('span.typical', { title: 'Typical for this dish; not on the menu' }, x[key]),
   ]);
 }
 
