@@ -454,6 +454,53 @@ textarea, .concerns, .feedback, .pref-form, .proposal, .cautions, .tray, .page, 
 button.primary:active { background: var(--ink-2); border-color: var(--ink-2); }
 @media (hover: hover) { button.primary:hover { background: var(--ink-2); border-color: var(--ink-2); } }
 
+/* --- Mobile flow: progress steps, sticky order bar, compact profile rows ------
+   Above the wide-screen blocks on purpose: those must stay last. */
+:root { --order-h: 3.75rem; }   /* sticky order bar, stacked above --nav-h */
+
+/* Progress while a menu is read: ● done, ◉ now, ○ still to come. */
+.working { display: block; padding: 1.75rem 0; font-style: normal; color: var(--ink); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; font: 400 .9rem/1.35 var(--mono); }
+.step { display: flex; align-items: center; gap: .75rem; }
+.step.next { color: var(--muted); }
+.step-mark { flex: none; width: .8rem; height: .8rem; border-radius: 50%; box-sizing: border-box; }
+.step.done .step-mark { background: var(--ink); }
+.step.now .step-mark { border: 1.5px solid var(--accent); box-shadow: inset 0 0 0 2.5px var(--paper), inset 0 0 0 10px var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+.step.next .step-mark { border: 1px solid var(--control-line); }
+.working .hint { margin-top: 1rem; }
+@media (prefers-reduced-motion: reduce) { .step.now .step-mark { animation: none; } }
+
+/* Sticky order bar: what you've ordered, above the tab bar. Steps aside while
+   the full tray is on screen (.tucked, set by an IntersectionObserver). */
+.order-bar:empty { display: none; }
+.order-bar {
+  position: fixed; left: 0; right: 0; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); z-index: 14;
+  min-height: var(--order-h); padding: .4rem var(--gutter-r) .4rem var(--gutter-l); display: flex; align-items: center;
+  background: var(--paper); border-top: 1px solid var(--ink);
+  transition: opacity .18s ease, transform .18s ease, visibility .18s;
+}
+.order-bar.tucked { opacity: 0; transform: translateY(.5rem); visibility: hidden; }
+.order-bar-inner { flex: 1; max-width: var(--wide); margin: 0 auto; display: flex; align-items: center; gap: .5rem; }
+.order-bar-sum { flex: 1; min-width: 0; margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .6rem; font: 400 .85rem/1.3 var(--mono); }
+.order-bar-mark::before { content: '●'; color: var(--accent); font-size: .75em; }
+.order-bar .price { color: var(--ink-2); }
+body:has(.order-bar:not(:empty)) { padding-bottom: calc(var(--nav-h) + var(--order-h) + env(safe-area-inset-bottom)); }
+body:has(.order-bar:not(:empty)) #toast { bottom: calc(var(--nav-h) + var(--order-h) + env(safe-area-inset-bottom) + .75rem); }
+
+/* Compact profile rows: name, meta and confidence line; edit and delete sit
+   inside the row's disclosure. Suggestions keep "That's me / Not me" visible. */
+.pref { padding: .7rem 0; gap: .35rem 1rem; }
+summary.pref-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: .75rem; align-items: baseline; min-height: var(--tap); cursor: pointer; list-style: none; padding: .15rem 0; }
+summary.pref-main::-webkit-details-marker { display: none; }
+summary.pref-main > * { grid-column: 1; }
+summary.pref-main::after { content: '+'; grid-column: 2; grid-row: 1; font: 400 1.1rem/1 var(--mono); color: var(--muted); }
+details.pref-more[open] > summary.pref-main::after { content: '−'; color: var(--accent); }
+summary.pref-main .meter { margin: .3rem 0 0; }
+summary.pref-main .pref-note { font: italic .95rem/1.4 var(--serif); color: var(--ink-2); margin-top: .2rem; }
+.pref-body { padding: .25rem 0 .5rem; }
+.pref-why { font: 500 .8rem/1.4 var(--sans); color: var(--muted); margin: .5rem 0 0; }
+.pref-actions.secondary { justify-content: start; margin: .5rem 0 .25rem; }
+
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
   body { font-size: 1.0625rem; padding-bottom: 0; }
@@ -482,6 +529,9 @@ button.primary:active { background: var(--ink-2); border-color: var(--ink-2); }
   .pref-actions { justify-content: end; }
   .tray { margin-top: 3rem; padding: 1.25rem; }
   #toast { bottom: 1.5rem; }
+  .order-bar { bottom: 0; padding-bottom: max(.4rem, env(safe-area-inset-bottom)); }
+  body:has(.order-bar:not(:empty)) { padding-bottom: var(--order-h); }
+  body:has(.order-bar:not(:empty)) #toast { bottom: calc(var(--order-h) + 1rem); }
 }
 /* Mouse and trackpad: compact secondary controls are fine. Touch keeps 44px. */
 @media (min-width: 40rem) and (hover: hover) and (pointer: fine) {
