@@ -2,7 +2,11 @@ import { h, mount, toast, fmtDate } from '../dom.js';
 import { FEEDBACK } from '/shared/model.js';
 import { signalsFor } from '/shared/profile.js';
 
-const open = new Set(); // entries whose feedback editor is open
+const open = new Set();   // entries whose feedback editor the user opened
+const closed = new Set(); // waiting entries the user folded away
+
+// The reactions most meals need; the specific ones sit under "More specific".
+const MAIN_FEEDBACK = ['loved', 'order_again', 'liked', 'disliked', 'not_today'];
 
 export function renderJournal(root, ctx) {
   const { store } = ctx;
@@ -20,15 +24,20 @@ export function renderJournal(root, ctx) {
     addForm(ctx, rerender),
     history.length === 0
       ? h('p.empty', {}, 'Nothing yet. When you order from a menu, it lands here.')
-      : h('ol.journal', {}, history.map((entry) => journalEntry(ctx, entry, rerender))),
+      : h('ol.journal', {}, history.map((entry) => journalEntry(ctx, entry, rerender, entry.id === waiting.find((x) => !closed.has(x.id))?.id))),
   );
 }
 
-function journalEntry(ctx, entry, rerender) {
+/**
+ * On a phone only one feedback form is open at a time: the next dish waiting
+ * for a verdict (or any the user opened). The rest are a single line.
+ */
+function journalEntry(ctx, entry, rerender, isNext) {
   const { store } = ctx;
-  const editing = open.has(entry.id) || (entry.action === 'ordered' && !entry.feedbackAt);
+  const waiting = entry.action === 'ordered' && !entry.feedbackAt;
+  const editing = open.has(entry.id) || isNext;
   const statusLabel = { ordered: 'Ordered', saved: 'Saved for later', skipped: 'Skipped' }[entry.action];
-  return h('li.entry', {},
+  return h(`li.entry${waiting ? '.waiting' : ''}`, {},
     h('div.entry-meta', {}, fmtDate(entry.at), ' · ', statusLabel, entry.recommended ? ' · recommended' : '', entry.restaurant.name ? ` · ${entry.restaurant.name}` : ''),
     h('h3.dish-name.s', {}, entry.dish.originalName),
     entry.dish.translatedName && h('p.dish-trans', {}, entry.dish.translatedName),
@@ -54,14 +63,16 @@ function feedbackEditor(ctx, entry, rerender) {
   const preview = h('div.preview');
   const updatePreview = () => mount(preview, teaches([...chosen], entry, ctx.store.profile));
 
-  const chips = Object.entries(FEEDBACK).map(([id, f]) => h('button', {
+  const chip = ([id, f]) => h('button', {
     type: 'button', class: `chip ${f.tone}${chosen.has(id) ? ' on' : ''}`, 'aria-pressed': String(chosen.has(id)),
     onclick: (e) => {
       chosen.has(id) ? chosen.delete(id) : chosen.add(id);
       e.currentTarget.classList.toggle('on'); e.currentTarget.setAttribute('aria-pressed', String(chosen.has(id)));
       updatePreview();
     },
-  }, f.label));
+  }, f.label);
+  const main = Object.entries(FEEDBACK).filter(([id]) => MAIN_FEEDBACK.includes(id));
+  const more = Object.entries(FEEDBACK).filter(([id]) => !MAIN_FEEDBACK.includes(id));
   updatePreview();
 
   return h('form.feedback', {
@@ -74,13 +85,18 @@ function feedbackEditor(ctx, entry, rerender) {
     },
   },
   h('p.small.muted', {}, 'How was it? Pick any that apply.'),
-  h('div.chips', {}, chips),
-  h('label.field', {}, h('span', {}, 'In your own words ', h('em', {}, 'optional')),
-    h('input', { type: 'text', maxlength: 300, value: note, oninput: (e) => { note = e.target.value; } })),
+  h('div.chips', {}, main.map(chip)),
+  h('details.quiet.more-feedback', { open: more.some(([id]) => chosen.has(id)) },
+    h('summary', {}, 'More specific'),
+    h('div.chips', {}, more.map(chip))),
+  h('details.quiet.note', { open: Boolean(note) },
+    h('summary', {}, 'Add a note'),
+    h('label.field', {}, h('span.visually-hidden', {}, 'In your own words'),
+      h('input', { type: 'text', maxlength: 300, value: note, placeholder: 'In your own words', oninput: (e) => { note = e.target.value; } }))),
   preview,
-  h('div.actions', {},
+  h('div.actions.feedback-actions', {},
     h('button.primary.small', { type: 'submit' }, 'Save feedback'),
-    open.has(entry.id) && h('button.ghost.small', { type: 'button', onclick: () => { open.delete(entry.id); rerender(); } }, 'Cancel'),
+    h('button.ghost.small', { type: 'button', onclick: () => { open.delete(entry.id); closed.add(entry.id); rerender(); } }, 'Later'),
     entry.action === 'ordered' && !entry.feedbackAt && h('button.ghost.small', {
       type: 'button',
       onclick: async () => { await ctx.store.do('applyFeedback', entry.id, [], ''); rerender(); },

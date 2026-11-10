@@ -564,6 +564,26 @@ details.what .evidence h4 { margin: 0 0 .3rem; }
 .section-jump { position: sticky; top: 0; z-index: 4; background: var(--paper); padding: .4rem 0; border-bottom: 1px solid var(--rule); }
 .menu-section { scroll-margin-top: 4rem; }
 
+/* Journal: one open feedback form at a time, five main reactions first */
+.entry { padding: 1.1rem 0; }
+.entry.waiting .entry-meta::before { content: '●'; color: var(--accent); margin-right: .45em; }
+.feedback { gap: .6rem; padding: .9rem; margin-top: .75rem; }
+.feedback > p.small { margin: 0; }
+.feedback details.quiet { margin-top: 0; }
+.feedback details.quiet > summary { min-height: var(--tap); display: flex; align-items: center; }
+.feedback details.quiet .chips, .feedback details.quiet .field { margin-top: .25rem; }
+.feedback-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.feedback-actions > * { width: 100%; }
+.feedback-actions .primary { grid-column: 1 / -1; }
+
+/* Disclosures laid out with flex lose the native triangle: mark them + / − */
+details.what > summary, details.today > summary, .feedback details.quiet > summary { list-style: none; }
+details.what > summary::-webkit-details-marker, details.today > summary::-webkit-details-marker, .feedback details.quiet > summary::-webkit-details-marker { display: none; }
+details.what > summary::before, details.today > summary::before, .feedback details.quiet > summary::before {
+  content: '+'; display: inline-block; width: 1.1em; font: 400 1rem/1 var(--mono); color: var(--muted);
+}
+details.what[open] > summary::before, details.today[open] > summary::before, .feedback details.quiet[open] > summary::before { content: '−'; color: var(--accent); }
+
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
   body { font-size: 1.0625rem; padding-bottom: 0; }
@@ -598,6 +618,8 @@ details.what .evidence h4 { margin: 0 0 .3rem; }
   .submit-bar { position: static; margin-inline: 0; padding: 0; border-top: 0; background: none; }
   .submit-bar { display: flex; }
   .submit-bar > * { width: auto; }
+  .feedback-actions { display: flex; }
+  .feedback-actions > * { width: auto; }
   .scroll-row { flex-wrap: wrap; overflow: visible; margin-inline: 0; padding: 0; -webkit-mask-image: none; mask-image: none; }
   .intro { padding: 3rem 0 1.5rem; }
   .pick { grid-template-columns: 4rem minmax(0, 1fr); gap: 0 1.5rem; padding: 2rem 0; }

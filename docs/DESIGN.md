@@ -38,4 +38,5 @@ The width comes from a 5 % bucket class (`.meter-fill.w0` … `.w100`) because t
 - **Pick cards** hold only what you need to decide: role, name, translation, price, why it suits you, the first "worth knowing" line and **+ Order this / Save**. Ingredients, preparation, flavours, the cultural note and the evidence open under **What it is**.
 - Rows of chips (occasions, menu sections) are one **swipeable row** on phones (`.scroll-row`), with the right edge faded to show there is more. They wrap again on wide screens.
 - The main action on the input page sits in a **sticky bar** above the tab bar (`.submit-bar`). The whole menu has **sticky section chips** for jumping between sections.
-
+- **Journal:** only the next dish waiting for feedback has its form open; the rest are one line with *Give feedback*. The five main reactions show first; the specific ones sit under *More specific*, and the note under *Add a note*. *Later* folds a form away.
+- Disclosures laid out with flex lose the browser's triangle, so they carry the same `+` / `−` mark as profile rows.
