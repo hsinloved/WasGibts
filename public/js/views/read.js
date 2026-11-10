@@ -13,7 +13,9 @@ const state = {
   sharedText: '',   // text that came with a share (e.g. place name from Google Maps)
   occasion: undefined,
   request: '',
-  busy: null,       // string while working
+  busy: null,       // string while working (the current step's label)
+  steps: null,      // [label, …] for the progress list; null when there is only one step
+  step: 0,          // index into steps
   error: null,
   autoStart: false,
   ...session.get(), // menu, recs survive reloads
@@ -83,10 +85,11 @@ export function renderRead(root, ctx) {
       h('p.lede', {}, 'Photograph a menu at the table, paste a Google Maps or delivery link from the office chat, or share screenshots. I’ll translate it, explain each dish, and pick a few for you.'),
     ),
     sourceForm(ctx, rerender),
-    state.busy && h('div.working', { role: 'status' }, h('span.dot'), state.busy),
+    state.busy && progress(),
     state.error && h('p.error', { role: 'alert' }, state.error),
     state.menu && !state.busy && results(ctx, rerender),
   );
+  watchTray();
   if (state.autoStart && ctx.ai.available) {
     state.autoStart = false;
     readMenu(ctx, rerender);
@@ -186,20 +189,21 @@ async function readMenu(ctx, rerender) {
         const url = text.match(/https?:\/\/\S+/)?.[0] ?? (state.link.trim() ? `https://${state.link.trim().replace(/^\/+/, '')}` : '');
         if (!url) throw new Error('Paste a link first.');
         source = { type: 'url', url, text };
-        state.busy = {
-          maps: 'Finding this restaurant’s menu online… this can take half a minute.',
-          platform: 'Reading the delivery menu…',
-        }[linkKind(text).kind] ?? 'Fetching the page and reading the menu…';
+        const first = {
+          maps: 'Finding this restaurant’s menu online',
+          platform: 'Reading the delivery menu',
+        }[linkKind(text).kind] ?? 'Fetching the page and reading the menu';
+        beginSteps([first, MATCHING]);
       } else {
         if (!state.pages.length) throw new Error('Take a photo or add a screenshot first.');
-        state.busy = 'Preparing your pages…'; rerender();
+        beginSteps(['Preparing your pages', `Reading ${plural(state.pages.length, 'page')}`, MATCHING]); rerender();
         source = { type: 'files', files: await readFiles(state.pages.map((p) => p.file)) };
         const size = source.files.reduce((n, f) => n + f.data.length, 0);
         const max = ctx.ai.maxUploadBytes ?? Infinity;
         if (size > max - 50_000) {
           throw new Error(`That’s ${(size / 1e6).toFixed(1)} MB — more than the server accepts at once (${(max / 1e6).toFixed(1)} MB). Read fewer pages at a time, or use photos instead of a large PDF.`);
         }
-        state.busy = `Reading ${plural(state.pages.length, 'page')}…`;
+        nextStep();
       }
       rerender();
       state.menu = normalizeMenu(await api.extract(source, { translateTo, glossLanguages, homeCity }));
@@ -207,10 +211,31 @@ async function readMenu(ctx, rerender) {
     state.recs = null;
     await refreshPicks(ctx, rerender);
   } catch (err) {
-    state.busy = null;
+    endSteps();
     state.error = err.message;
     rerender();
   }
+}
+
+// --- Progress -------------------------------------------------------------------
+// Reading a menu takes 20–60 s. Show where we are: ● done, ◉ now, ○ still to come.
+
+const MATCHING = 'Matching dishes to your taste';
+function beginSteps(list) { state.steps = list; state.step = 0; state.busy = list[0]; }
+function nextStep() { state.step = Math.min(state.step + 1, state.steps.length - 1); state.busy = state.steps[state.step]; }
+function endSteps() { state.steps = null; state.step = 0; state.busy = null; }
+
+function progress() {
+  const steps = state.steps ?? [state.busy];
+  return h('div.working', { role: 'status', 'aria-busy': 'true' },
+    h('ol.steps', {}, steps.map((label, i) => {
+      const where = i < state.step ? 'done' : i === state.step ? 'now' : 'next';
+      return h(`li.step.${where}`, { 'aria-current': where === 'now' ? 'step' : null },
+        h('span.step-mark', { 'aria-hidden': 'true' }),
+        h('span', {}, label, where === 'now' ? '…' : ''),
+        where === 'done' && h('span.visually-hidden', {}, ' (done)'));
+    })),
+    h('p.hint', {}, 'Usually under a minute. You can keep this screen open.'));
 }
 
 async function refreshPicks(ctx, rerender) {
@@ -222,7 +247,8 @@ async function refreshPicks(ctx, rerender) {
     : [];
   try {
     if (ai.available) {
-      state.busy = 'Matching dishes to your taste…'; rerender();
+      if (state.steps) nextStep(); else beginSteps([MATCHING]);
+      rerender();
       state.recs = await api.recommend({
         menu: state.menu, occasion: state.occasion, request: state.request, screen,
         language: profile.settings.translateTo, includeAdventurous: profile.settings.includeAdventurousPick,
@@ -235,7 +261,7 @@ async function refreshPicks(ctx, rerender) {
     state.recs = recommendLocally(state.menu, profile, { occasion: state.occasion });
     state.recs.fallbackReason = err.message;
   }
-  state.busy = null;
+  endSteps();
   persist();
   rerender();
   document.querySelector('.results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -283,6 +309,7 @@ function results(ctx, rerender) {
     ),
 
     h('section.order-tray', { id: 'order-tray' }, orderTray(ctx)),
+    h('section.order-bar', { id: 'order-bar', 'aria-label': 'Your order' }, orderBar(ctx)),
 
     h('section.full-menu', {},
       h('h2.section-title', {}, 'The whole menu'),
@@ -396,6 +423,34 @@ function currentOrder(store) {
 function refreshTray(ctx) {
   const el = document.getElementById('order-tray');
   if (el) mount(el, orderTray(ctx));
+  const bar = document.getElementById('order-bar');
+  if (bar) mount(bar, orderBar(ctx));
+  watchTray();
+}
+
+/**
+ * The sticky bar above the tab bar: what you've ordered so far, and the two
+ * things you need at the table. It steps aside while the full tray is on screen.
+ */
+function orderBar(ctx) {
+  const items = currentOrder(ctx.store);
+  if (!items.length) return null;
+  const total = orderTotal(items);
+  return h('div.order-bar-inner', {},
+    h('p.order-bar-sum', {}, h('span.order-bar-mark', { 'aria-hidden': 'true' }), plural(items.length, 'dish', 'dishes'), total && h('span.price', {}, total)),
+    h('button.small.ghost', { type: 'button', onclick: () => document.getElementById('order-tray')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, 'View'),
+    h('button.small.primary', { type: 'button', onclick: () => showToStaff(items) }, 'Show to staff'),
+  );
+}
+
+let trayObserver;
+function watchTray() {
+  trayObserver?.disconnect();
+  const tray = document.getElementById('order-tray');
+  const bar = document.getElementById('order-bar');
+  if (!tray || !bar || !('IntersectionObserver' in window)) return;
+  trayObserver = new IntersectionObserver(([e]) => bar.classList.toggle('tucked', e.isIntersecting));
+  trayObserver.observe(tray);
 }
 
 function orderTotal(items) {

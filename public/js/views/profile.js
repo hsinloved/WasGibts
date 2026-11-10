@@ -90,29 +90,41 @@ function prefRow(pref, ctx, rerender) {
       : isUnverifiedPrior(pref) ? 'you listed as likely · not yet tested' : `noticed · ${confidenceLabel(pref.confidence)}`;
   const act = (op, label, cls = 'ghost') => h(`button.small.${cls}`, { type: 'button', onclick: async () => { await store.do(op, pref.id); rerender(); } }, label);
 
+  const primary = [
+    pref.status === 'suggested' && act('confirmPreference', 'That’s me', 'confirm'),
+    pref.status === 'suggested' && act('dismissPreference', 'Not me'),
+    pref.status === 'dismissed' && act('restorePreference', 'Restore'),
+  ].filter(Boolean);
+  const secondary = [
+    pref.status !== 'dismissed' && h('button.small.ghost', { type: 'button', onclick: () => { ui.editing = pref.id; rerender(); } }, 'Edit'),
+    pref.status !== 'suggested' && h('button.small.ghost.danger', {
+      type: 'button', onclick: async () => { if (confirm(`Delete “${pref.subject}”?`)) { await store.do('removePreference', pref.id); rerender(); } },
+    }, 'Delete'),
+  ].filter(Boolean);
+  const why = pref.origin === 'inferred' && pref.status === 'suggested'
+    ? `Why I think this · ${plural(pref.evidence.length, 'piece')} of evidence (weight ${evidenceScore(pref).toFixed(1)})`
+    : 'Evidence and history';
+
+  // The row itself is the disclosure: tap the name to see the evidence and to
+  // edit or delete. Only the call to action stays outside it (confirm or
+  // dismiss a suggestion, restore a dismissed one), which keeps the profile
+  // one short row per preference on a phone.
   return h('li.pref', {},
-    h('div.pref-main', {},
-      h('span.pref-subject', {}, pref.subject),
-      h('span.pref-meta', {}, [pref.category, origin, ...pref.contexts.map((c) => `only ${OCCASIONS[c].label.toLowerCase()}`)].join(' · ')),
-      pref.status !== 'dismissed' && confidenceMeter(pref),
-      pref.note && h('p.pref-note', {}, pref.note),
+    h('details.pref-more', {},
+      h('summary.pref-main', {},
+        h('span.pref-subject', {}, pref.subject),
+        h('span.pref-meta', {}, [pref.category, origin, ...pref.contexts.map((c) => `only ${OCCASIONS[c].label.toLowerCase()}`)].join(' · ')),
+        pref.status !== 'dismissed' && confidenceMeter(pref),
+        pref.note && h('span.pref-note', {}, pref.note),
+      ),
+      h('div.pref-body', {},
+        secondary.length > 0 && h('div.pref-actions.secondary', {}, secondary),
+        h('p.pref-why', {}, why),
+        h('ul.evidence-list', {}, pref.evidence.map((e) => h('li', {}, h('span.date', {}, fmtDate(e.at)), ' ', e.note))),
+        h('ul.history-list', {}, pref.history.map((c) => h('li', {}, h('span.date', {}, fmtDate(c.at)), ` ${c.by === 'user' ? 'You' : 'WasGibts'}: ${c.action}${c.detail ? ` — ${c.detail}` : ''}`))),
+      ),
     ),
-    h('div.pref-actions', {},
-      pref.status === 'suggested' && act('confirmPreference', 'That’s me', 'confirm'),
-      pref.status === 'suggested' && act('dismissPreference', 'Not me'),
-      pref.status === 'dismissed' && act('restorePreference', 'Restore'),
-      pref.status !== 'dismissed' && h('button.small.ghost', { type: 'button', onclick: () => { ui.editing = pref.id; rerender(); } }, 'Edit'),
-      pref.status !== 'suggested' && h('button.small.ghost.danger', {
-        type: 'button', onclick: async () => { if (confirm(`Delete “${pref.subject}”?`)) { await store.do('removePreference', pref.id); rerender(); } },
-      }, 'Delete'),
-    ),
-    h('details.why', {},
-      h('summary', {}, pref.origin === 'inferred' && pref.status === 'suggested'
-        ? `Why I think this · ${plural(pref.evidence.length, 'piece')} of evidence (weight ${evidenceScore(pref).toFixed(1)})`
-        : 'Evidence and history'),
-      h('ul.evidence-list', {}, pref.evidence.map((e) => h('li', {}, h('span.date', {}, fmtDate(e.at)), ' ', e.note))),
-      h('ul.history-list', {}, pref.history.map((c) => h('li', {}, h('span.date', {}, fmtDate(c.at)), ` ${c.by === 'user' ? 'You' : 'WasGibts'}: ${c.action}${c.detail ? ` — ${c.detail}` : ''}`))),
-    ),
+    primary.length > 0 && h('div.pref-actions', {}, primary),
   );
 }
 

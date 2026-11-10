@@ -20,6 +20,10 @@ WasGibts looks like a page of field notes: things observed are kept visibly apar
 
 Base rules are the phone layout; the two `min-width: 40rem` blocks at the very end of `styles.css` add the wide-screen layout and **must stay last**, so add new rules above them. Touch targets get their 44px from `min-height: var(--tap)`, not padding. The bottom tab bar's height is `--nav-h`; the active tab is marked with a terracotta ● via `aria-current`. The paper grain sits at `z-index: -1` and nothing else sets a stacking context on the page shell, so the fixed tab bar stays above content. No text below 12px (`.75rem`).
 
+- **Progress** while a menu is read is a short list of steps in the same marks: ● done, a ringed terracotta dot for the current step, ○ still to come (`.steps`, announced through `role="status"`).
+- **Order bar:** once you order a dish, a bar fixed above the tab bar shows how many dishes, the total, *View* and *Show to staff*. Its height is `--order-h`; the page padding and the toast stack above it via `body:has(.order-bar:not(:empty))`. It steps aside (`.tucked`) while the full order tray is on screen.
+- **Profile rows** are their own disclosure: the name, meta and confidence line are the `<summary>` (marked `+` / `−`). Edit, Delete and the evidence sit inside. Only the call to action stays outside: *That's me / Not me* on suggestions, *Restore* on dismissed items.
+
 ## Confidence line
 
 The width comes from a 5 % bucket class (`.meter-fill.w0` … `.w100`) because the Content-Security-Policy forbids inline styles. Unconfirmed patterns are drawn in light ink and can never cross the dashed line. Stated and confirmed preferences are drawn in full ink and may go past it.
