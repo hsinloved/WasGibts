@@ -24,7 +24,7 @@ See [docs/DATA_MODEL.md](docs/DATA_MODEL.md) for the data model, inference rules
 
 ```bash
 npm install
-cp .env.example .env      # add ANTHROPIC_API_KEY
+cp .env.example .env      # add ANTHROPIC_API_KEY or OPENAI_API_KEY
 npm start                 # http://127.0.0.1:8890
 npm test
 ```
@@ -33,9 +33,12 @@ Without an API key, the app still runs: the sample menu and the built-in matcher
 
 | env | default | |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | none | enables menu reading, AI recommendations and profile import |
+| `ANTHROPIC_API_KEY` | none | enables menu reading, AI recommendations and profile import with Claude |
+| `OPENAI_API_KEY` | none | the same with OpenAI instead; used when no Anthropic key is set, or when `AI_PROVIDER=openai` |
+| `AI_PROVIDER` | automatic | `anthropic` or `openai`. Unset: Anthropic if its key is set, otherwise OpenAI |
+| `OPENAI_MODEL` | `gpt-5` | any OpenAI model with vision and structured outputs |
 | `APP_PASSCODE` | none | if set, the app asks for this passcode once per device before it uses the AI |
-| `WASGIBTS_MODEL` | `claude-opus-5-5` | |
+| `WASGIBTS_MODEL` | `claude-opus-5-5` | Anthropic model |
 | `WASGIBTS_EFFORT` | `medium` | `low` is cheaper and faster; `high` is more careful |
 | `WASGIBTS_FALLBACKS` | on | server-side refusal fallback; set `off` to disable |
 | `WASGIBTS_RATE_LIMIT` | `40` | AI calls per IP per 10 minutes |
@@ -46,7 +49,7 @@ Without an API key, the app still runs: the sample menu and the built-in matcher
 The repo is ready for Vercel as is. `vercel.json` serves `public/` as static files and runs `server.js` as one function under `/api`.
 
 1. On vercel.com, choose **Add New → Project** and import **hsinloved/WasGibts**. Vercel reads the settings from `vercel.json`, so leave framework, build and output settings as they are.
-2. Under **Environment Variables**, add `ANTHROPIC_API_KEY`, and `APP_PASSCODE` so that only people you give the passcode to can spend your key. Optional: `WASGIBTS_MODEL`, `WASGIBTS_EFFORT`, `WASGIBTS_RATE_LIMIT`. After changing a variable, redeploy.
+2. Under **Environment Variables**, add `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY` to use your OpenAI credit), and `APP_PASSCODE` so that only people you give the passcode to can spend your key. Optional: `WASGIBTS_MODEL`, `WASGIBTS_EFFORT`, `WASGIBTS_RATE_LIMIT`. After changing a variable, redeploy.
 3. Click **Deploy**, then open the `*.vercel.app` URL on your phone and install it (see *Three ways in*).
 
 Notes:
@@ -97,7 +100,7 @@ To add accounts later, add a `RemoteRepository` and `/api/profile` routes. See t
 ## Limitations (MVP)
 
 - Websites that render their menu with JavaScript, or show it only as images, yield little text. The app then suggests uploading a photo or the PDF instead.
-- Google Maps menu photos can't be read from a link (Google offers no open access to them). The app searches for the restaurant's own menu instead, using Claude's web search tool, which must be enabled for your Anthropic organization. Menus found this way may be out of date.
+- Google Maps menu photos can't be read from a link (Google offers no open access to them). The app searches for the restaurant's own menu instead, using the AI provider's web search tool, which must be enabled for your Anthropic organization or OpenAI project. If it isn't, the app tells you to use screenshots instead. Menus found this way may be out of date.
 - Delivery platforms often block automated reading, and their page formats change. Expect screenshots to be the dependable route there.
 - Photos are downscaled in the browser to 2000 px. HEIC files may need converting first.
 - The URL fetcher checks the resolved address before connecting but does not pin it, so DNS-rebinding protection is basic. Put it behind an egress proxy if you expose it publicly.

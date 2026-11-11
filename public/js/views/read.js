@@ -219,7 +219,7 @@ function sourceForm(ctx, rerender) {
     state.menu && h('button.ghost', { type: 'button', disabled: Boolean(state.busy), onclick: () => { state.editing = false; refreshPicks(ctx, rerender); } }, 'Update picks'),
     state.menu && h('button.ghost', { type: 'button', onclick: () => { state.editing = false; state.error = null; rerender(); } }, 'Cancel'),
   ),
-  disabled && !ai.locked && h('p.ai-note.muted', {}, 'Reading real menus needs an AI key on the server (ANTHROPIC_API_KEY). The sample menu and the built-in matcher work without one.'),
+  disabled && !ai.locked && h('p.ai-note.muted', {}, 'Reading real menus needs an AI key on the server (ANTHROPIC_API_KEY or OPENAI_API_KEY). The sample menu and the built-in matcher work without one.'),
   );
 }
 
