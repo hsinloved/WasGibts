@@ -1,5 +1,5 @@
 import { h, mount, toast, plural } from '../dom.js';
-import { api, readFiles } from '../api.js';
+import { api, readFiles, passcode } from '../api.js';
 import { session } from '../store.js';
 import { OCCASIONS } from '/shared/model.js';
 import { normalizeMenu, priceLabel, dishSnapshot, STYLE_ATTRIBUTES } from '/shared/menu.js';
@@ -108,6 +108,38 @@ function occasionChips(onChange) {
   }, o.label)));
 }
 
+/**
+ * Shown when the server has an AI key but wants a passcode first. Lives inside
+ * the source form, so it is a group with a button rather than a nested form.
+ */
+function unlockField(ctx, rerender) {
+  let value = '';
+  let msg;
+  const unlock = async () => {
+    if (!value.trim()) return;
+    passcode.set(value.trim());
+    const s = await api.status();
+    if (s.locked || s.error || !s.available) {
+      passcode.set('');
+      msg.textContent = s.error ?? 'That passcode didn’t work.';
+      return;
+    }
+    Object.assign(ctx.ai, s);
+    toast('Unlocked on this device.');
+    rerender();
+  };
+  return h('div.unlock', { role: 'group', 'aria-label': 'Passcode' },
+    h('label.field', {}, h('span', {}, 'Passcode'),
+      h('input', {
+        type: 'password', autocomplete: 'current-password', enterkeyhint: 'go', maxlength: 200,
+        oninput: (e) => { value = e.target.value; },
+        onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); unlock(); } },
+      })),
+    h('button.small', { type: 'button', onclick: unlock }, 'Unlock'),
+    msg = h('p.error.small', { role: 'alert' }),
+    h('p.hint', {}, 'Reading real menus is protected on this server. Enter the passcode once; this phone remembers it. The sample menu works without it.'));
+}
+
 function sourceForm(ctx, rerender) {
   const { ai } = ctx;
   const tabs = [['photos', 'Photos & screenshots'], ['link', 'Link'], ['sample', 'Sample menu']];
@@ -170,6 +202,7 @@ function sourceForm(ctx, rerender) {
     onclick: () => { state.tab = id; state.error = null; rerender(); },
   }, label))),
   input,
+  ai.locked && state.tab !== 'sample' && unlockField(ctx, rerender),
   h('fieldset.occasions', {},
     h('legend', {}, 'The occasion'),
     occasionChips(() => { persist(); rerender(); }),
@@ -186,7 +219,7 @@ function sourceForm(ctx, rerender) {
     state.menu && h('button.ghost', { type: 'button', disabled: Boolean(state.busy), onclick: () => { state.editing = false; refreshPicks(ctx, rerender); } }, 'Update picks'),
     state.menu && h('button.ghost', { type: 'button', onclick: () => { state.editing = false; state.error = null; rerender(); } }, 'Cancel'),
   ),
-  disabled && h('p.ai-note.muted', {}, 'Reading real menus needs an AI key on the server (ANTHROPIC_API_KEY). The sample menu and the built-in matcher work without one.'),
+  disabled && !ai.locked && h('p.ai-note.muted', {}, 'Reading real menus needs an AI key on the server (ANTHROPIC_API_KEY). The sample menu and the built-in matcher work without one.'),
   );
 }
 
@@ -226,6 +259,7 @@ async function readMenu(ctx, rerender) {
     state.editing = false;
     await refreshPicks(ctx, rerender);
   } catch (err) {
+    if (err.status === 401) { passcode.set(''); Object.assign(ctx.ai, { available: false, locked: true }); }
     endSteps();
     state.editing = true;
     state.error = err.message;

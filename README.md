@@ -34,6 +34,7 @@ Without an API key, the app still runs: the sample menu and the built-in matcher
 | env | default | |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | none | enables menu reading, AI recommendations and profile import |
+| `APP_PASSCODE` | none | if set, the app asks for this passcode once per device before it uses the AI |
 | `WASGIBTS_MODEL` | `claude-opus-5-5` | |
 | `WASGIBTS_EFFORT` | `medium` | `low` is cheaper and faster; `high` is more careful |
 | `WASGIBTS_FALLBACKS` | on | server-side refusal fallback; set `off` to disable |
@@ -45,13 +46,13 @@ Without an API key, the app still runs: the sample menu and the built-in matcher
 The repo is ready for Vercel as is. `vercel.json` serves `public/` as static files and runs `server.js` as one function under `/api`.
 
 1. On vercel.com, choose **Add New → Project** and import **hsinloved/WasGibts**. Vercel reads the settings from `vercel.json`, so leave framework, build and output settings as they are.
-2. Under **Environment Variables**, add `ANTHROPIC_API_KEY`. Optional: `WASGIBTS_MODEL`, `WASGIBTS_EFFORT`, `WASGIBTS_RATE_LIMIT`.
+2. Under **Environment Variables**, add `ANTHROPIC_API_KEY`, and `APP_PASSCODE` so that only people you give the passcode to can spend your key. Optional: `WASGIBTS_MODEL`, `WASGIBTS_EFFORT`, `WASGIBTS_RATE_LIMIT`. After changing a variable, redeploy.
 3. Click **Deploy**, then open the `*.vercel.app` URL on your phone and install it (see *Three ways in*).
 
 Notes:
 - Vercel accepts at most about 4.5 MB per request. Photos are shrunk in the browser to fit, and the app warns before sending something too big. Up to about 8 pages work in one go; large PDFs may need splitting.
 - Reading a long menu can take a minute or more. The function is allowed 300 s, which needs Vercel's default *Fluid compute*; if your plan rejects that, lower `maxDuration` in `vercel.json` to 60.
-- Anyone with the URL can use your API key through the app. The built-in limit is 40 AI calls per IP per 10 minutes. For a personal deployment, consider turning on Vercel's **Deployment Protection** (password or Vercel login).
+- Without `APP_PASSCODE`, anyone with the URL can use your API key through the app. With it, reading menus, AI picks and profile import need the passcode, which each phone enters once (it is kept in that browser's storage). Wrong guesses are limited to 10 per IP per 10 minutes. The built-in limit of 40 AI calls per IP per 10 minutes is held in memory, so on Vercel it resets often; also set a monthly spend limit in the Anthropic console.
 
 GitHub Pages is not an option: it only hosts static files, so there would be nowhere to keep the API key, and only the sample menu would work.
 

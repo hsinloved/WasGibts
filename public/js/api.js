@@ -1,9 +1,19 @@
 // Thin client for the server's AI endpoints.
 
+// The server may ask for a passcode before it uses the AI (APP_PASSCODE). It is
+// entered once and kept on this device only.
+const PASSCODE_KEY = 'wasgibts-passcode';
+export const passcode = {
+  get() { try { return localStorage.getItem(PASSCODE_KEY) || ''; } catch { return ''; } },
+  set(v) { try { if (v) localStorage.setItem(PASSCODE_KEY, v); else localStorage.removeItem(PASSCODE_KEY); } catch { /* private mode: lasts this page only */ } memory = v || ''; },
+};
+let memory = '';
+const authHeaders = () => { const p = passcode.get() || memory; return p ? { 'X-WasGibts-Passcode': p } : {}; };
+
 async function post(path, body) {
   let res;
   try {
-    res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) });
   } catch {
     throw new Error('Could not reach the server. Are you online?');
   }
@@ -14,7 +24,11 @@ async function post(path, body) {
 
 export const api = {
   async status() {
-    try { return await (await fetch('/api/status')).json(); } catch { return { available: false }; }
+    try {
+      const s = await (await fetch('/api/status', { headers: authHeaders() })).json();
+      // Locked behind a passcode: everything that needs the AI treats it as unavailable.
+      return s.locked ? { ...s, available: false } : s;
+    } catch { return { available: false }; }
   },
   extract: (source, settings) => post('/api/menu/extract', { source, ...settings }),
   recommend: (payload) => post('/api/recommend', payload),
