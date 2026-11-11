@@ -99,7 +99,7 @@ To add accounts later, add a `RemoteRepository` and `/api/profile` routes. See t
 
 ## Limitations (MVP)
 
-- Websites that render their menu with JavaScript, or show it only as images, yield little text. The app then suggests uploading a photo or the PDF instead.
+- Websites that render their menu with JavaScript, or show it only as images, yield little text. The app then suggests uploading a photo or the PDF instead. The exception is restaurant online shops built on **FoodAmigos** (common in Germany): their menu is read from the shop's public menu data instead (`lib/shops.js`, where other platforms can be added).
 - Google Maps menu photos can't be read from a link (Google offers no open access to them). The app searches for the restaurant's own menu instead, using the AI provider's web search tool, which must be enabled for your Anthropic organization or OpenAI project. If it isn't, the app tells you to use screenshots instead. Menus found this way may be out of date.
 - Delivery platforms often block automated reading, and their page formats change. Expect screenshots to be the dependable route there.
 - Photos are downscaled in the browser to 2000 px. HEIC files may need converting first.
