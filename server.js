@@ -4,6 +4,7 @@
 // database here and a RemoteRepository in public/js/store.js.
 
 import { createServer } from 'node:http';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -61,6 +62,31 @@ function rateLimit(req, max = Number(process.env.WASGIBTS_RATE_LIMIT) || 40, win
   list.push(t); hits.set(ip, list);
 }
 
+// Optional passcode for the AI endpoints. A public deployment with an API key
+// would otherwise let anyone with the URL spend it. Set APP_PASSCODE on the
+// server; the app asks for it once per device and sends it in a header.
+const passcodeSet = () => Boolean(process.env.APP_PASSCODE?.trim());
+const digest = (v) => createHash('sha256').update(String(v)).digest();
+const failures = new Map();
+
+/** True when no passcode is configured, or the request carries the right one. Wrong guesses are rate limited per IP. */
+function passcodeOk(req) {
+  if (!passcodeSet()) return true;
+  const got = req.headers['x-wasgibts-passcode'];
+  if (typeof got !== 'string' || !got || got.length > 200) return false;
+  const ip = req.socket.remoteAddress ?? '?';
+  const t = Date.now();
+  const recent = (failures.get(ip) ?? []).filter((x) => t - x < 10 * 60_000);
+  if (recent.length >= 10) throw new HttpError(429, 'Too many wrong passcodes. Try again in ten minutes.');
+  if (timingSafeEqual(digest(got), digest(process.env.APP_PASSCODE.trim()))) return true;
+  recent.push(t); failures.set(ip, recent);
+  return false;
+}
+
+function requirePasscode(req) {
+  if (!passcodeOk(req)) throw new HttpError(401, 'Enter the passcode to read menus with AI.');
+}
+
 function requireAI() {
   if (!aiAvailable()) throw new HttpError(503, 'No AI key is configured on this server, so only the sample menu and the built-in matcher are available.');
 }
@@ -86,10 +112,16 @@ async function serveStatic(pathname, res) {
 
 const routes = {
   'GET /healthz': async () => ({ ok: true }),
-  'GET /api/status': async () => ({ ...aiInfo(), maxUploadBytes: MAX_UPLOAD }),
+  'GET /api/status': async (req) => ({
+    ...aiInfo(),
+    maxUploadBytes: MAX_UPLOAD,
+    // locked: AI is configured but this request lacks the passcode.
+    locked: aiAvailable() && !passcodeOk(req),
+  }),
 
   'POST /api/menu/extract': async (req) => {
     requireAI();
+    requirePasscode(req);
     rateLimit(req);
     const body = await readJson(req, LIMITS.extract);
     const src = body.source ?? {};
@@ -122,6 +154,7 @@ const routes = {
 
   'POST /api/recommend': async (req) => {
     requireAI();
+    requirePasscode(req);
     rateLimit(req);
     const body = await readJson(req, LIMITS.default * 4);
     if (!body.menu?.dishes?.length) throw new HttpError(400, 'Missing menu');
@@ -139,6 +172,7 @@ const routes = {
 
   'POST /api/profile/parse': async (req) => {
     requireAI();
+    requirePasscode(req);
     rateLimit(req);
     const body = await readJson(req, LIMITS.default);
     const text = String(body.text ?? '').trim();
