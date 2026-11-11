@@ -17,6 +17,7 @@ const state = {
   steps: null,      // [label, …] for the progress list; null when there is only one step
   step: 0,          // index into steps
   error: null,
+  editing: false,   // show the input form above existing results
   autoStart: false,
   ...session.get(), // menu, recs survive reloads
 };
@@ -78,13 +79,16 @@ export function renderRead(root, ctx) {
   }
   const rerender = () => renderRead(root, ctx);
 
+  // Once a menu is read, results come first: the intro and the form fold into
+  // one compact header with a Change button.
+  const compact = state.menu && !state.busy && !state.editing;
   mount(root,
-    h('section.intro', {},
+    !compact && !state.menu && h('section.intro', {},
       h('p.eyebrow', {}, 'Read a menu'),
       h('h1.display', {}, 'What’s good here, for you?'),
-      h('p.lede', {}, 'Photograph a menu at the table, paste a Google Maps or delivery link from the office chat, or share screenshots. I’ll translate it, explain each dish, and pick a few for you.'),
+      h('p.lede', {}, 'Photograph the menu, paste a link or share screenshots. I’ll translate it and pick a few dishes for you.'),
     ),
-    sourceForm(ctx, rerender),
+    !compact && sourceForm(ctx, rerender),
     state.busy && progress(),
     state.error && h('p.error', { role: 'alert' }, state.error),
     state.menu && !state.busy && results(ctx, rerender),
@@ -94,6 +98,14 @@ export function renderRead(root, ctx) {
     state.autoStart = false;
     readMenu(ctx, rerender);
   }
+}
+
+/** The occasions as one swipeable row of chips. */
+function occasionChips(onChange) {
+  return h('div.chips.scroll-row', {}, Object.entries(OCCASIONS).map(([id, o]) => h('button', {
+    type: 'button', class: `chip${state.occasion === id ? ' on' : ''}`, 'aria-pressed': String(state.occasion === id), title: o.blurb,
+    onclick: () => { state.occasion = state.occasion === id ? null : id; onChange(); },
+  }, o.label)));
 }
 
 function sourceForm(ctx, rerender) {
@@ -113,7 +125,7 @@ function sourceForm(ctx, rerender) {
   let input;
   if (state.tab === 'photos') {
     input = h('div.photos', {},
-      h('p.hint.top', {}, 'At the table: photograph each page. From Google Maps or a delivery app: screenshot the menu and add the screenshots.'),
+      h('p.hint.top', {}, 'Photograph each page, or add screenshots from Google Maps or a delivery app.'),
       state.pages.length > 0 && h('ol.pages', {}, state.pages.map((pg, i) => h('li.page', {},
         pg.url ? h('img', { src: pg.url, alt: `Page ${i + 1}` }) : h('span.pdf', {}, 'PDF'),
         h('span.page-n', {}, String(i + 1)),
@@ -160,17 +172,19 @@ function sourceForm(ctx, rerender) {
   input,
   h('fieldset.occasions', {},
     h('legend', {}, 'The occasion'),
-    h('div.chips', {}, Object.entries(OCCASIONS).map(([id, o]) => h('button', {
-      type: 'button', class: `chip${state.occasion === id ? ' on' : ''}`, 'aria-pressed': String(state.occasion === id), title: o.blurb,
-      onclick: () => { state.occasion = state.occasion === id ? null : id; persist(); rerender(); },
-    }, o.label))),
+    occasionChips(() => { persist(); rerender(); }),
     h('p.hint', {}, OCCASIONS[state.occasion]?.blurb ?? 'Not set — I’ll ask if it changes what I’d pick.'),
   ),
-  h('label.field', {}, h('span', {}, 'Anything in particular today? ', h('em', {}, 'optional, not saved to your profile')),
-    h('input', { type: 'text', maxlength: 300, enterkeyhint: 'go', placeholder: 'e.g. something light, no noodles', value: state.request, oninput: (e) => { state.request = e.target.value; } })),
-  h('div.actions', {},
+  h('details.today', { open: Boolean(state.request) },
+    h('summary', {}, 'Anything in particular today? ', h('em', {}, 'optional')),
+    h('label.field', {}, h('span.visually-hidden', {}, 'Anything in particular today? Not saved to your profile.'),
+      h('input', { type: 'text', maxlength: 300, enterkeyhint: 'go', placeholder: 'e.g. something light, no noodles', value: state.request, oninput: (e) => { state.request = e.target.value; } }),
+      h('span.hint', {}, 'Just for this menu. Not saved to your profile.'))),
+  // Sticky on phones: the main action never scrolls out of reach.
+  h('div.actions.submit-bar', {},
     h('button.primary', { type: 'submit', disabled: Boolean(state.busy) || disabled }, state.tab === 'sample' ? 'Open the sample menu' : 'Read the menu'),
-    state.menu && h('button.ghost', { type: 'button', disabled: Boolean(state.busy), onclick: () => refreshPicks(ctx, rerender) }, 'Update picks'),
+    state.menu && h('button.ghost', { type: 'button', disabled: Boolean(state.busy), onclick: () => { state.editing = false; refreshPicks(ctx, rerender); } }, 'Update picks'),
+    state.menu && h('button.ghost', { type: 'button', onclick: () => { state.editing = false; state.error = null; rerender(); } }, 'Cancel'),
   ),
   disabled && h('p.ai-note.muted', {}, 'Reading real menus needs an AI key on the server (ANTHROPIC_API_KEY). The sample menu and the built-in matcher work without one.'),
   );
@@ -209,9 +223,11 @@ async function readMenu(ctx, rerender) {
       state.menu = normalizeMenu(await api.extract(source, { translateTo, glossLanguages, homeCity }));
     }
     state.recs = null;
+    state.editing = false;
     await refreshPicks(ctx, rerender);
   } catch (err) {
     endSteps();
+    state.editing = true;
     state.error = err.message;
     rerender();
   }
@@ -264,7 +280,7 @@ async function refreshPicks(ctx, rerender) {
   endSteps();
   persist();
   rerender();
-  document.querySelector('.results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // --- Results -------------------------------------------------------------------
@@ -276,26 +292,26 @@ function results(ctx, rerender) {
 
   return h('section.results', {},
     h('header.menu-head', {},
-      h('p.eyebrow', {}, menu.source.kind === 'sample' ? 'Sample' : 'From', ' · ', menu.source.url ? h('a', { href: menu.source.url, target: '_blank', rel: 'noopener noreferrer' }, menu.source.label) : menu.source.label),
-      h('h2.display-s', {}, menu.restaurant.name ?? 'This menu'),
-      h('p.muted', {}, [menu.restaurant.cuisine, plural(menu.dishes.length, 'dish', 'dishes'), menu.restaurant.menuLanguage && `menu in ${menu.restaurant.menuLanguage}`].filter(Boolean).join(' · ')),
-      menu.notes.length > 0 && h('ul.notes', {}, menu.notes.map((n) => h('li', {}, n))),
+      h('div.menu-head-top', {},
+        h('div', {},
+          h('p.eyebrow', {}, menu.source.kind === 'sample' ? 'Sample' : 'From', ' · ', menu.source.url ? h('a', { href: menu.source.url, target: '_blank', rel: 'noopener noreferrer' }, menu.source.label) : menu.source.label),
+          h('h2.display-s', {}, menu.restaurant.name ?? 'This menu'),
+          h('p.muted.small', {}, [menu.restaurant.cuisine, plural(menu.dishes.length, 'dish', 'dishes'), menu.restaurant.menuLanguage && `menu in ${menu.restaurant.menuLanguage}`].filter(Boolean).join(' · '))),
+        h('button.small.ghost', { type: 'button', onclick: () => { state.editing = true; rerender(); window.scrollTo({ top: 0 }); } }, 'Change')),
+      menu.notes.length > 0 && h('details.quiet.notes-more', {}, h('summary', {}, `Notes about this menu (${menu.notes.length})`), h('ul.notes', {}, menu.notes.map((n) => h('li', {}, n)))),
+      // Switch the occasion right here; the picks update in place.
+      h('div.occasion-switch', { role: 'group', 'aria-label': 'The occasion' },
+        occasionChips(() => { persist(); refreshPicks(ctx, rerender); }),
+        recs?.occasionQuestion && !state.occasion && h('p.hint', {}, recs.occasionQuestion)),
     ),
 
     recs && h('section.picks', {},
       h('div.picks-head', {},
         h('p.eyebrow', {}, state.occasion ? `For you · ${OCCASIONS[state.occasion].label}` : 'For you'),
         h('p.headline', {}, recs.headline),
-        h('p.engine', {}, recs.engine === 'ai'
-          ? 'Picked by the AI from your profile. Details marked “typical” are general knowledge, not from this menu.'
-          : 'Picked by the built-in matcher, which only uses exact matches with your profile.'),
+        h('p.engine', {}, recs.engine === 'ai' ? 'Picked by the AI from your taste profile.' : 'Picked by the built-in matcher (exact matches with your profile only).'),
         recs.fallbackReason && h('p.error.small', {}, `The AI couldn’t help this time (${recs.fallbackReason}), so these come from the built-in matcher.`),
       ),
-      recs.occasionQuestion && !state.occasion && h('div.ask', {},
-        h('p', {}, recs.occasionQuestion),
-        h('div.chips', {}, ['solo', 'sharing', 'office'].map((id) => h('button.chip', {
-          type: 'button', onclick: () => { state.occasion = id; refreshPicks(ctx, rerender); },
-        }, OCCASIONS[id].label)))),
       h('ol.pick-list', {}, recs.picks.map((p, i) => {
         const d = byId.get(p.dishId);
         return d && pickCard(ctx, d, p, i);
@@ -313,7 +329,11 @@ function results(ctx, rerender) {
 
     h('section.full-menu', {},
       h('h2.section-title', {}, 'The whole menu'),
-      [...sections].map(([name, dishes]) => h('div.menu-section', {},
+      sections.size > 1 && h('nav.section-jump', { 'aria-label': 'Menu sections' },
+        h('div.chips.scroll-row', {}, [...sections.keys()].map((name, i) => h('button.chip', {
+          type: 'button', onclick: () => document.getElementById(`menu-sec-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+        }, name)))),
+      [...sections].map(([name, dishes], i) => h('div.menu-section', { id: `menu-sec-${i}` },
         h('h3.menu-section-title', {}, name),
         dishes.map((d) => h('details.dish-row', {},
           h('summary', {},
@@ -327,6 +347,7 @@ function results(ctx, rerender) {
 }
 
 function pickCard(ctx, d, p, i) {
+  const [firstConcern, ...moreConcerns] = p.concerns;
   return h('li.pick', {},
     h('div.pick-num', { 'aria-hidden': 'true' }, h('span', {}, String(i + 1))),
     h('article', {},
@@ -336,13 +357,16 @@ function pickCard(ctx, d, p, i) {
         priceLabel(d) && h('p.price', {}, priceLabel(d)),
       ),
       h('p.why', {}, p.whyYou),
-      p.evidence.length > 0 && h('details.evidence', {},
-        h('summary', {}, 'What this is based on'),
-        h('ul', {}, p.evidence.map((e) => h('li', {}, h('span.tag', {}, evidenceLabel(e.type)), e.text))),
-      ),
-      p.concerns.length > 0 && h('div.concerns', {}, h('h4', {}, 'Worth knowing'), h('ul', {}, p.concerns.map((c) => h('li', {}, c)))),
-      dishDetail(d),
+      firstConcern && h('p.concern-line', {}, h('span.label', {}, 'Worth knowing'), ' ', firstConcern),
       dishActions(ctx, d, true),
+      h('details.what', {},
+        h('summary', {}, 'What it is'),
+        moreConcerns.length > 0 && h('div.concerns', {}, h('h4', {}, 'Also worth knowing'), h('ul', {}, moreConcerns.map((c) => h('li', {}, c)))),
+        dishDetail(d),
+        p.evidence.length > 0 && h('div.evidence', {},
+          h('h4.label', {}, 'What this pick is based on'),
+          h('ul', {}, p.evidence.map((e) => h('li', {}, h('span.tag', {}, evidenceLabel(e.type)), e.text)))),
+      ),
     ),
   );
 }
@@ -397,8 +421,8 @@ function dishActions(ctx, d, recommended) {
     toast(action === 'ordered' ? 'Added to your order. Tell me how it was afterwards.' : 'Saved to your journal.', { href: '#/journal', label: 'Open journal' });
   };
   return h('div.dish-actions', {},
-    h('button.small', { type: 'button', disabled: inJournal('ordered'), dataset: { order: d.originalName }, onclick: (e) => add('ordered', e) }, inJournal('ordered') ? 'Ordered ✓' : 'I’m ordering this'),
-    h('button.small.ghost', { type: 'button', disabled: inJournal('saved'), onclick: (e) => add('saved', e) }, inJournal('saved') ? 'Saved ✓' : 'Save for later'),
+    h('button.small', { type: 'button', disabled: inJournal('ordered'), dataset: { order: d.originalName }, onclick: (e) => add('ordered', e) }, inJournal('ordered') ? 'Ordered ✓' : '+ Order this'),
+    h('button.small.ghost', { type: 'button', disabled: inJournal('saved'), onclick: (e) => add('saved', e) }, inJournal('saved') ? 'Saved ✓' : 'Save'),
   );
 }
 
@@ -486,7 +510,7 @@ function orderTray(ctx) {
         onclick: async () => {
           await ctx.store.do('removeHistory', entry.id);
           const btn = [...document.querySelectorAll('[data-order]')].filter((b) => b.dataset.order === dish.originalName);
-          btn.forEach((b) => { b.disabled = false; b.textContent = 'I’m ordering this'; });
+          btn.forEach((b) => { b.disabled = false; b.textContent = '+ Order this'; });
           refreshTray(ctx);
         },
       }, 'Remove'))))),
