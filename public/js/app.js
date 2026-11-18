@@ -3,8 +3,9 @@ import { api } from './api.js';
 import { renderRead, receiveShare } from './views/read.js';
 import { renderJournal } from './views/journal.js';
 import { renderProfile } from './views/profile.js';
+import { renderKitchen } from './views/kitchen.js';
 
-const views = { '': renderRead, journal: renderJournal, profile: renderProfile };
+const views = { '': renderRead, journal: renderJournal, kitchen: renderKitchen, profile: renderProfile };
 
 async function main() {
   const store = createStore();
