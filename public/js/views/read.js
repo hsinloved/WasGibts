@@ -384,7 +384,7 @@ function refineBar(ctx, rerender) {
     h('form.refine-form', { onsubmit: (e) => { e.preventDefault(); refine(ctx, rerender, state.refineText); } },
       h('label.refine-label', { for: 'refine-input' }, 'Refine my picks'),
       h('div.refine-row', {},
-        h('input', { id: 'refine-input', type: 'text', maxlength: 300, enterkeyhint: 'send', autocomplete: 'off', placeholder: 'e.g. not that hungry, no fish today', value: state.refineText, oninput: (e) => { state.refineText = e.target.value; } }),
+        h('input', { id: 'refine-input', type: 'text', maxlength: 300, enterkeyhint: 'send', autocomplete: 'off', placeholder: 'e.g. no fish today', value: state.refineText, oninput: (e) => { state.refineText = e.target.value; } }),
         h('button.primary.small', { type: 'submit', disabled: Boolean(state.busy) }, 'Refine')),
       h('div.chips.scroll-row.refine-examples', {}, REFINE_EXAMPLES.map((x) => h('button.chip', { type: 'button', disabled: Boolean(state.busy), onclick: () => refine(ctx, rerender, x) }, x))),
     ),
