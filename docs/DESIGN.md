@@ -8,7 +8,7 @@ The menu board as a shout: fat rounded letters, one ink outline weight, flat col
 - **Type:** *Bagel Fat One* for the wordmark and page titles, *Titan One* for headings, dish names, buttons and chips, *Inter* for reading, *DM Mono* for small labels.
 - **Chinese and Japanese in headings and dish names:** *Mantou Sans* (饅頭黑體, OFL, based on Dela Gothic One), self-hosted in `public/fonts/` and served **unmodified**, because its licence reserves the name for unmodified copies (so no subsetting). Its `unicode-range` means the 2.7 MB file only downloads on screens that show those characters, and it is cached for a year. It covers Traditional Chinese fully. Simplified characters it lacks (鱼 鸡 锅 …) fall back to *Noto Sans SC Black* from Google Fonts, which is served in small slices. Reading text stays in the system font.
 - **Shapes:** one outline weight (`--outline`, 3px). Buttons and chips are pills. Pick cards and the order tray are cream cards with an ink outline and a 4px ink drop. Pick numbers are yolk stickers tilted −8°. Menu sections sit between two heavy rules.
-- **Brand moments:** the green header with the diagonal wrapper of dish names (`public/band.png`), the yolk tab pill, the yolk order bar, the yolk staff view. The emblem is a bowl with chopsticks (favicon and app icons).
+- **Brand moments:** the green header with the diagonal wrapper of dish names (`public/band.png`), the yolk tab pill, the yolk order bar, the yolk staff view. The app icon is the "?" bowl (see Icons).
 
 ## Meaning marks (unchanged)
 
@@ -37,7 +37,14 @@ The width comes from a 5 % bucket class (`.meter-fill.w0` … `.w100`) because t
 
 ## Icons
 
-`public/favicon.svg` and `icon-192/512.png` show the emblem: a paprika bowl with chopsticks on a yolk sticker, on green. It sits inside the 80 % maskable safe zone.
+**The "?" bowl:** a fat yolk question mark on WasGibts green whose dot is a paprika bowl, with chopsticks reaching up into the hook. "Was gibts?" in one shape. The master is `design/app-icon-1024.png`; every size is a straight downscale of it:
+
+| file | use |
+|---|---|
+| `public/icon-192.png`, `icon-512.png` | home-screen icon (`purpose: any`) |
+| `public/icon-maskable-512.png` | Android adaptive icon: the art scaled into the 80 % safe circle on a full green square (`purpose: maskable`) |
+| `public/apple-touch-icon.png` | iPhone home screen (180 px) |
+| `public/favicon-48.png`, `favicon-32.png` | browser tab |
 
 ## Results first
 
