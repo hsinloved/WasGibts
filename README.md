@@ -42,6 +42,8 @@ Without an API key, the app still runs: the sample menu and the built-in matcher
 | `WASGIBTS_EFFORT` | `medium` | `low` is cheaper and faster; `high` is more careful |
 | `WASGIBTS_FALLBACKS` | on | server-side refusal fallback; set `off` to disable |
 | `WASGIBTS_RATE_LIMIT` | `40` | AI calls per IP per 10 minutes |
+| `WASGIBTS_RENDER` | on | restaurant sites that load their menu with JavaScript are rendered in headless Chromium; set `off` to disable |
+| `CHROMIUM_PATH` | Playwright's | self-hosted only: the Chromium to render with. On Vercel the bundled `@sparticuz/chromium` is used |
 | `PORT` / `HOST` | `8890` / `127.0.0.1` | |
 
 ## Deploy on Vercel
