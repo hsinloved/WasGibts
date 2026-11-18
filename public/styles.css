@@ -797,6 +797,19 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
 .recipe { border: 2px solid var(--ink); border-radius: 16px; padding: .8rem 1rem; background: var(--paper); }
 .recipe .keeps { margin: .35rem 0; }
 
+/* Weekly boxes: six numbered sticker slots. */
+.box-grid { list-style: none; margin: .5rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+.box-slot { width: 100%; min-height: 5.5rem; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; align-items: center; column-gap: .6rem; text-align: left;
+  padding: .6rem .7rem; border: var(--outline) solid var(--ink); border-radius: 16px; background: var(--paper); font-family: var(--sans); font-weight: 600; letter-spacing: 0; }
+.box-slot.empty { border-style: dashed; color: var(--muted); font-weight: 400; }
+.box-slot.open { background: color-mix(in srgb, var(--yolk) 30%, var(--paper)); }
+.box-no { grid-row: 1 / span 2; width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--ink); background: var(--yolk); color: #171412; font-family: var(--heading); font-size: 1.1rem; }
+.box-title { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
+.box-verdict { font-family: var(--mono); font-size: .7rem; font-weight: 400; color: var(--green); }
+.box-detail { margin-top: 1rem; padding-top: .8rem; border-top: 2px dashed var(--ink); }
+.eat-by { font-weight: 700; margin: .2rem 0 .6rem; }
+.box-rate { margin-top: .8rem; }
+
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
   body { font-size: 1.0625rem; padding-bottom: 0; }

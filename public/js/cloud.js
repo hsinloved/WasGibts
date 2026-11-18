@@ -190,3 +190,72 @@ export async function deleteRecipe(id) {
   const { error } = await sb.from('recipes').delete().eq('id', id);
   fail(error);
 }
+
+// --- Weekly boxes -------------------------------------------------------------------------
+
+/** The prep day a plan belongs to: the Saturday on or before `date` (YYYY-MM-DD, local time). */
+export function prepDay(date = new Date()) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() - ((d.getDay() + 1) % 7)); // Sat=6 → 0 days back, Sun → 1, Fri → 6
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** The latest plan, or null. */
+export async function latestPlan(householdId) {
+  const sb = await client();
+  const { data, error } = await sb.from('plans').select('id, week_of, note').eq('household_id', householdId).order('week_of', { ascending: false }).limit(1);
+  fail(error);
+  return data?.[0] ?? null;
+}
+
+/** This weekend's plan, created if needed. */
+export async function planFor(householdId, weekOf = prepDay()) {
+  const sb = await client();
+  const found = await sb.from('plans').select('id, week_of, note').eq('household_id', householdId).eq('week_of', weekOf).maybeSingle();
+  fail(found.error);
+  if (found.data) return found.data;
+  const { data, error } = await sb.from('plans').insert({ household_id: householdId, week_of: weekOf }).select('id, week_of, note').single();
+  fail(error);
+  return data;
+}
+
+export async function boxes(planId) {
+  const sb = await client();
+  const [b, r] = await Promise.all([
+    sb.from('boxes').select('box_no, recipe_id, made_on, note, updated_at, recipes(id, cuisine, title, title_original, summary, data)').eq('plan_id', planId).order('box_no'),
+    sb.from('ratings').select('box_no, user_id, verdict, note, at').eq('plan_id', planId),
+  ]);
+  fail(b.error); fail(r.error);
+  return (b.data ?? []).map((x) => ({
+    boxNo: x.box_no, madeOn: x.made_on, note: x.note,
+    recipe: x.recipes ? { id: x.recipes.id, cuisine: x.recipes.cuisine, title: x.recipes.title, titleOriginal: x.recipes.title_original, summary: x.recipes.summary, ...x.recipes.data } : null,
+    ratings: (r.data ?? []).filter((y) => y.box_no === x.box_no),
+  }));
+}
+
+export async function setBox(planId, boxNo, recipeId, madeOn) {
+  const sb = await client();
+  if (!recipeId) {
+    const { error } = await sb.from('boxes').delete().eq('plan_id', planId).eq('box_no', boxNo);
+    return fail(error);
+  }
+  const { error } = await sb.from('boxes').upsert({ plan_id: planId, box_no: boxNo, recipe_id: recipeId, made_on: madeOn, updated_at: new Date().toISOString() });
+  fail(error);
+}
+
+export async function rate(planId, boxNo, verdict, note = '') {
+  const sb = await client();
+  const user = await currentUser();
+  const { error } = await sb.from('ratings').upsert({ plan_id: planId, box_no: boxNo, user_id: user.id, verdict, note: String(note).slice(0, 300), at: new Date().toISOString() });
+  fail(error);
+}
+
+/** Live updates: calls `fn` whenever a box or rating in this plan changes (on any phone). */
+export async function watchPlan(planId, fn) {
+  const sb = await client();
+  const channel = sb.channel(`plan-${planId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'boxes', filter: `plan_id=eq.${planId}` }, fn)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ratings', filter: `plan_id=eq.${planId}` }, fn)
+    .subscribe();
+  return () => sb.removeChannel(channel);
+}

@@ -8,10 +8,11 @@ import * as cloud from '../cloud.js';
 import { api } from '../api.js';
 import { CUISINES } from '/shared/recipes.js';
 
-const ui = { step: 'email', email: '', code: '', busy: false, error: null, user: undefined, households: null, members: [], invite: null, shared: null, name: '', joinCode: '', listening: false, cuisine: 'Taiwanese', wish: '', ideas: null, removed: [], saved: null, filter: 'All', savedIds: new Set() };
+const ui = { step: 'email', email: '', code: '', busy: false, error: null, user: undefined, households: null, members: [], invite: null, shared: null, name: '', joinCode: '', listening: false, cuisine: 'Taiwanese', wish: '', ideas: null, removed: [], saved: null, filter: 'All', savedIds: new Set(), plan: null, boxes: [], openBox: null, unwatch: null };
 
 export function renderKitchen(root, ctx) {
-  const rerender = () => renderKitchen(root, ctx);
+  const rerender = () => { if (location.hash.startsWith('#/kitchen')) renderKitchen(root, ctx); };
+  ui.redraw = rerender;
   if (!ui.listening) {
     ui.listening = true;
     cloud.onAuthChange(async (user) => { ui.user = user; ui.households = null; await load(ctx); rerender(); }).catch((e) => { ui.error = e.message; rerender(); });
@@ -31,6 +32,20 @@ export function renderKitchen(root, ctx) {
   );
 }
 
+/** The latest week's boxes, with live updates while this tab is open. */
+async function loadPlan(householdId, plan = undefined) {
+  ui.plan = plan === undefined ? await cloud.latestPlan(householdId) : plan;
+  ui.boxes = ui.plan ? await cloud.boxes(ui.plan.id) : [];
+  if (ui.plan && ui.watching !== ui.plan.id) {
+    ui.unwatch?.();
+    ui.watching = ui.plan.id;
+    ui.unwatch = await cloud.watchPlan(ui.plan.id, async () => {
+      ui.boxes = await cloud.boxes(ui.plan.id);
+      ui.redraw?.();
+    });
+  }
+}
+
 async function load(ctx) {
   try {
     ui.user = await cloud.currentUser();
@@ -43,6 +58,7 @@ async function load(ctx) {
         ui.shared = shared.find((r) => r.user_id === ui.user.id) ?? null;
         ui.everyone = shared;
         ui.saved = await cloud.listRecipes(home.id);
+        await loadPlan(home.id);
       }
     }
     ui.error = null;
@@ -104,6 +120,7 @@ function household(ctx, home, rerender) {
   const me = ui.user.id;
   const share = cloud.restrictionsToShare(ctx.store.profile);
   return h('div', {},
+    boxesBlock(ctx, home, rerender),
     ideasBlock(ctx, home, rerender),
     savedBlock(home, rerender),
     h('section.block.kitchen-card', {},
@@ -133,8 +150,7 @@ function household(ctx, home, rerender) {
         ui.shared && h('button.ghost', { type: 'button', disabled: ui.busy, onclick: () => busy(rerender, async () => { await cloud.stopSharingRestrictions(home.id); ui.shared = null; }) }, 'Stop sharing')),
       ui.shared && h('p.small.muted', {}, 'Shared. Update after you change your restrictions.')),
 
-    h('p.small.muted.kitchen-next', {}, 'This week’s numbered boxes are coming next.'),
-    accountLine(rerender, home));
+        accountLine(rerender, home));
 }
 
 function accountLine(rerender, home = null) {
@@ -201,4 +217,67 @@ export function recipeCard(r, { action = null } = {}) {
       r.whyItBoxesWell && h('p.small.muted', {}, r.whyItBoxesWell),
       r.storage && h('p.small.muted', {}, r.storage)),
     action && h('div.actions', {}, action));
+}
+
+// --- This week's boxes ------------------------------------------------------------------
+
+const VERDICTS = { loved: 'Loved it', fine: 'It was fine', not_again: 'Not again' };
+const day = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+const addDays = (iso, n) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+
+function boxesBlock(ctx, home, rerender) {
+  const me = ui.user.id;
+  const names = new Map(ui.members.map((m) => [m.user_id, m.user_id === me ? 'You' : (m.display_name || 'They')]));
+  const thisWeekend = cloud.prepDay();
+  const start = () => busy(rerender, async () => { await loadPlan(home.id, await cloud.planFor(home.id, thisWeekend)); });
+  if (!ui.plan) {
+    return h('section.block.kitchen-card', {},
+      h('h2.section-title', {}, 'This week’s boxes'),
+      h('p.muted', {}, 'Number your meal-prep boxes 1 to 6 and put a saved recipe in each. Whoever eats them sees what’s inside, how to reheat it and when to eat it by.'),
+      h('div.actions', {}, h('button.primary', { type: 'button', disabled: ui.busy, onclick: start }, 'Start this weekend’s boxes')));
+  }
+  const byNo = new Map(ui.boxes.map((b) => [b.boxNo, b]));
+  return h('section.block.kitchen-card', {},
+    h('h2.section-title', {}, `Boxes · ${day(ui.plan.week_of)}`),
+    ui.plan.week_of < thisWeekend && h('p.small.muted', {}, 'These are from an earlier weekend. ',
+      h('button.ghost.small', { type: 'button', disabled: ui.busy, onclick: start }, 'Start this weekend’s')),
+    h('ol.box-grid', {}, [1, 2, 3, 4, 5, 6].map((n) => {
+      const b = byNo.get(n);
+      const mine = b?.ratings.find((r) => r.user_id === me);
+      return h('li', {}, h('button', {
+        type: 'button', class: `box-slot${b ? '' : ' empty'}${ui.openBox === n ? ' open' : ''}`, 'aria-expanded': String(ui.openBox === n),
+        onclick: () => { ui.openBox = ui.openBox === n ? null : n; rerender(); },
+      },
+      h('span.box-no', { 'aria-hidden': 'true' }, String(n)),
+      h('span.box-title', {}, b?.recipe ? b.recipe.title : 'Empty'),
+      mine && h('span.box-verdict', {}, VERDICTS[mine.verdict])));
+    })),
+    ui.openBox && boxDetail(ctx, ui.openBox, byNo.get(ui.openBox), names, rerender));
+}
+
+function boxDetail(ctx, n, b, names, rerender) {
+  const recipes = ui.saved ?? [];
+  const choose = h('label.field', {}, h('span', {}, `What’s in box ${n}?`),
+    h('select', {
+      disabled: ui.busy,
+      onchange: (e) => busy(rerender, async () => { await cloud.setBox(ui.plan.id, n, e.target.value || null, ui.plan.week_of); ui.boxes = await cloud.boxes(ui.plan.id); }),
+    },
+    h('option', { value: '' }, recipes.length ? '— empty —' : 'Save a recipe below first'),
+    recipes.map((r) => h('option', { value: r.id, selected: b?.recipe?.id === r.id }, `${r.title} (${r.cuisine})`))));
+  if (!b?.recipe) return h('div.box-detail', {}, choose);
+  const r = b.recipe;
+  const eatBy = b.madeOn && r.keepsDays ? addDays(b.madeOn, r.keepsDays) : null;
+  const mine = b.ratings.find((x) => x.user_id === ui.user.id);
+  return h('div.box-detail', {},
+    h('p.eyebrow', {}, `Box ${n}`),
+    eatBy && h('p.eat-by', {}, `Made ${day(b.madeOn)} · eat by ${day(eatBy)}`),
+    h('ul.recipe-list', {}, recipeCard(r)),
+    h('div.box-rate', {},
+      h('p.small', {}, 'How was it?'),
+      h('div.chips', {}, Object.entries(VERDICTS).map(([v, label]) => h('button', {
+        type: 'button', class: `chip${mine?.verdict === v ? ' on' : ''}`, 'aria-pressed': String(mine?.verdict === v), disabled: ui.busy,
+        onclick: () => busy(rerender, async () => { await cloud.rate(ui.plan.id, n, v); ui.boxes = await cloud.boxes(ui.plan.id); }),
+      }, label)))),
+    b.ratings.filter((x) => x.user_id !== ui.user.id).map((x) => h('p.small.muted', {}, `${names.get(x.user_id) ?? 'Someone'}: ${VERDICTS[x.verdict]}${x.note ? ` — “${x.note}”` : ''}`)),
+    h('details.quiet', {}, h('summary', {}, 'Change what’s in this box'), choose));
 }
