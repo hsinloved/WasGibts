@@ -60,7 +60,7 @@ export async function onAuthChange(fn) {
 /** Email a sign-in code (and link). New addresses get an account. */
 export async function sendCode(email) {
   const sb = await client();
-  const { error } = await sb.auth.signInWithOtp({ email: String(email).trim(), options: { shouldCreateUser: true, emailRedirectTo: `${location.origin}/#/kitchen` } });
+  const { error } = await sb.auth.signInWithOtp({ email: String(email).trim(), options: { shouldCreateUser: true, emailRedirectTo: `${location.origin}/` } });
   fail(error);
 }
 
