@@ -143,3 +143,20 @@ Occasion-specific preferences (`contexts`) follow one rule in both layers (`appl
 - Add `GET/PUT/DELETE /api/profile` in `server.js`, keyed by `ownerId`. Validate with `normalizeProfile`, which already handles migration.
 - For a relational store, `preferences`, `restrictions`, `history` and their `evidence`/`history` arrays map directly to tables. `evidence.ref → history.id` becomes a foreign key.
 - On first sign-in, upload the local profile and set `ownerId`.
+
+## Session context ("Refine my picks")
+
+`shared/session.js` reads what the diner says about *this meal* ("I've already
+eaten", "something starchy", "actually, no fish today") into:
+
+```
+{ hunger: 'ate'|'light'|'hungry'|null, sharing: 'partner'|'group'|'solo'|null,
+  novelty: 'adventurous'|'familiar'|null, cravings: [key], avoid: [key], log: [{text, kind, changes, unparsed}] }
+```
+
+- It lives in `sessionStorage` with the menu, resets when a new menu is read, and is **never written to the profile**.
+- Each statement is classified as `context`, `craving` (incl. a temporary "not today"), `correction` (overrides an earlier statement; the latest wins) or `durable`. Durable statements ("I never eat coriander") apply to this meal and are *offered* as a profile update the diner can tap; nothing is saved without that tap.
+- Food groups (starchy, protein, vegetables, fish, seafood, meat…) match on words and dish attributes; a specific food ("noodles") is matched as itself, so "no noodles" does not rule out rice.
+- The menu is reused; refining never re-extracts it.
+- Both recommenders use it. Locally, a craving outweighs stored taste for today, and "not today" sets a dish aside even when the profile says the diner usually likes it (the headline says the profile is unchanged). The AI gets `<session>` and the previous picks and may write a `changeNote`; afterwards `enforceSession()` sets aside any pick that matches "not today", and the guard drops `session` evidence when nothing was said.
+- `explainChange()` builds the "In / Out / moved to the top" lines deterministically from the two shortlists. Statements the matcher couldn't read are shown to the diner rather than guessed at.

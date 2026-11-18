@@ -6,6 +6,8 @@ import { normalizeMenu, priceLabel, dishSnapshot, STYLE_ATTRIBUTES } from '/shar
 import { profileForAI } from '/shared/profile.js';
 import { recommendLocally, screenRestrictions } from '/shared/recommend.js';
 import { guardRecommendation, allowedRefsFrom } from '/shared/guard.js';
+import { emptySession, applyStatement, removeFromSession, describeSession, isEmptySession, enforceSession, explainChange } from '/shared/session.js';
+import { dishText } from '/shared/menu.js';
 
 const state = {
   tab: 'photos',
@@ -20,9 +22,14 @@ const state = {
   error: null,
   editing: false,   // show the input form above existing results
   autoStart: false,
+  // "Refine my picks": what the diner said about this meal (shared/session.js).
+  // Lives with the menu in sessionStorage and never touches the profile.
+  refine: emptySession(),
+  change: null,     // { lines, entry, note } after the latest refinement
+  refineText: '',
   ...session.get(), // menu, recs survive reloads
 };
-const persist = () => session.set({ menu: state.menu, recs: state.recs, occasion: state.occasion, request: state.request, link: state.link });
+const persist = () => session.set({ menu: state.menu, recs: state.recs, occasion: state.occasion, request: state.request, link: state.link, refine: state.refine, change: state.change });
 
 const PLATFORM_RX = /(lieferando|thuisbezorgd|just-eat|takeaway\.com|wolt\.com|ubereats|deliveroo|foodora|foodpanda)/i;
 const PLATFORM_NAMES = { lieferando: 'Lieferando', thuisbezorgd: 'Thuisbezorgd', 'just-eat': 'Just Eat', 'takeaway.com': 'Takeaway', 'wolt.com': 'Wolt', ubereats: 'Uber Eats', deliveroo: 'Deliveroo', foodora: 'foodora', foodpanda: 'foodpanda' };
@@ -258,6 +265,9 @@ async function readMenu(ctx, rerender) {
     }
     state.recs = null;
     state.editing = false;
+    // A new menu starts a new session; the "anything today?" text seeds it.
+    state.refine = state.request.trim() ? applyStatement(emptySession(), state.request).session : emptySession();
+    state.change = null;
     await refreshPicks(ctx, rerender);
   } catch (err) {
     if (err.status === 401) { passcode.set(''); Object.assign(ctx.ai, { available: false, locked: true }); }
@@ -289,8 +299,9 @@ function progress() {
     h('p.hint', {}, 'Usually under a minute. You can keep this screen open.'));
 }
 
-async function refreshPicks(ctx, rerender) {
+async function refreshPicks(ctx, rerender, { explain = false } = {}) {
   const { store, ai } = ctx;
+  const previous = state.recs;
   const profile = store.profile;
   state.error = null;
   const screen = profile.settings.shareRestrictionsWithAI
@@ -301,29 +312,93 @@ async function refreshPicks(ctx, rerender) {
       if (state.steps) nextStep(); else beginSteps([MATCHING]);
       rerender();
       state.recs = await api.recommend({
-        menu: state.menu, occasion: state.occasion, request: state.request, screen,
+        menu: state.menu, occasion: state.occasion, screen,
+        session: state.refine, previous: explain ? (previous?.picks ?? []).map((p) => p.dishId) : [],
         language: profile.settings.translateTo, includeAdventurous: profile.settings.includeAdventurousPick,
         profile: profileForAI(profile, { occasion: state.occasion }),
       });
     } else {
-      state.recs = recommendLocally(state.menu, profile, { occasion: state.occasion });
+      state.recs = recommendLocally(state.menu, profile, { occasion: state.occasion, session: state.refine });
     }
   } catch (err) {
-    state.recs = recommendLocally(state.menu, profile, { occasion: state.occasion });
+    state.recs = recommendLocally(state.menu, profile, { occasion: state.occasion, session: state.refine });
     state.recs.fallbackReason = err.message;
   }
   // Always, whatever produced the picks: enforce every restriction (including
   // ones kept private from the AI) and drop evidence the profile can't back.
   const fallbackReason = state.recs.fallbackReason;
-  state.recs = guardRecommendation(state.recs, state.menu, {
+  state.recs = enforceSession(guardRecommendation(state.recs, state.menu, {
     restrictions: profile.restrictions,
     allowedRefs: allowedRefsFrom(profileForAI(profile, { occasion: state.occasion }), profile.restrictions),
-  });
+    session: state.refine,
+  }), state.menu, state.refine, dishText);
   if (fallbackReason) state.recs.fallbackReason = fallbackReason;
+  if (explain && state.change) {
+    state.change.lines = explainChange(previous, state.recs, state.menu);
+    state.change.note = state.recs.changeNote ?? null;
+  }
   endSteps();
   persist();
   rerender();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (!explain) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// --- Refine my picks -----------------------------------------------------------
+
+const REFINE_EXAMPLES = [
+  'I’ve already eaten',
+  'I want something starchy',
+  'I’d like more protein',
+  'I can share some of my partner’s food',
+  'Actually, I don’t feel like fish today',
+];
+
+function refine(ctx, rerender, text) {
+  const t = String(text).trim();
+  if (!t || state.busy) return;
+  const { session: next, entry } = applyStatement(state.refine, t);
+  state.refine = next;
+  state.refineText = '';
+  state.change = { entry, lines: [], note: null };
+  refreshPicks(ctx, rerender, { explain: true });
+}
+
+function refineBar(ctx, rerender) {
+  const active = describeSession(state.refine);
+  const entry = state.change?.entry;
+  const unparsed = entry?.unparsed ?? [];
+  const local = state.recs?.engine !== 'ai';
+  return h('section.refine', { 'aria-label': 'Refine my picks' },
+    h('form.refine-form', { onsubmit: (e) => { e.preventDefault(); refine(ctx, rerender, state.refineText); } },
+      h('label.refine-label', { for: 'refine-input' }, 'Refine my picks'),
+      h('div.refine-row', {},
+        h('input', { id: 'refine-input', type: 'text', maxlength: 300, enterkeyhint: 'send', autocomplete: 'off', placeholder: 'e.g. not that hungry, no fish today', value: state.refineText, oninput: (e) => { state.refineText = e.target.value; } }),
+        h('button.primary.small', { type: 'submit', disabled: Boolean(state.busy) }, 'Refine')),
+      h('div.chips.scroll-row.refine-examples', {}, REFINE_EXAMPLES.map((x) => h('button.chip', { type: 'button', disabled: Boolean(state.busy), onclick: () => refine(ctx, rerender, x) }, x))),
+    ),
+    active.length > 0 && h('div.refine-active', {},
+      h('p.eyebrow', {}, 'Just for this meal'),
+      h('div.chips', {}, active.map((c) => h('button.chip.on', {
+        type: 'button', 'aria-label': `Remove “${c.label}”`, disabled: Boolean(state.busy),
+        onclick: () => { state.refine = removeFromSession(state.refine, c.dim, c.value); state.change = { entry: { text: `Removed: ${c.label}`, kind: 'correction', unparsed: [], suggestions: [] }, lines: [], note: null }; refreshPicks(ctx, rerender, { explain: true }); },
+      }, c.label, h('span.x', { 'aria-hidden': 'true' }, ' ×')))),
+      h('button.ghost.small', { type: 'button', disabled: Boolean(state.busy), onclick: () => { state.refine = emptySession(); state.change = null; refreshPicks(ctx, rerender); } }, 'Start over'),
+    ),
+    state.change && h('div.refine-change', { role: 'status' },
+      state.change.lines.length > 0 && h('ul.change-lines', {}, state.change.lines.map((l) => h(`li.change-${l.kind}`, {}, l.text))),
+      state.change.note && h('p.small', {}, state.change.note),
+      unparsed.length > 0 && h('p.small.muted', {},
+        local
+          ? `I couldn’t act on “${unparsed.join('”, “')}”. The built-in matcher understands hunger, sharing, “something new/familiar” and simple foods (starchy, protein, veg, fish, meat, sweet, spicy…).`
+          : `Passed on as written: “${unparsed.join('”, “')}”.`),
+      (entry?.suggestions ?? []).map((sg) => h('p.callout.small.save-suggest', {},
+        `That sounds like it’s true beyond today: ${sg.polarity === 'like' ? 'you like' : 'you’d rather avoid'} ${sg.subject}. `,
+        h('button.small', { type: 'button', onclick: async (e) => {
+          await ctx.store.do('addPreference', { polarity: sg.polarity, category: 'other', subject: sg.subject, note: `Saved from “${entry.text}”`, contexts: [] });
+          e.target.closest('.save-suggest').replaceChildren(`Saved to your profile: ${sg.polarity === 'like' ? 'likes' : 'avoids'} ${sg.subject}.`);
+        } }, 'Save to my profile'))),
+    ),
+  );
 }
 
 // --- Results -------------------------------------------------------------------
@@ -356,6 +431,7 @@ function results(ctx, rerender) {
         recs.fallbackReason && h('p.error.small', {}, `The AI couldn’t help this time (${recs.fallbackReason}), so these come from the built-in matcher.`),
         guardNote(recs, byId),
       ),
+      refineBar(ctx, rerender),
       h('ol.pick-list', {}, recs.picks.map((p, i) => {
         const d = byId.get(p.dishId);
         return d && pickCard(ctx, d, p, i);

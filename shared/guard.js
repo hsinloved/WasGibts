@@ -18,6 +18,7 @@
 
 import { screenRestrictions } from './recommend.js';
 import { dishText } from './menu.js';
+import { isEmptySession } from './session.js';
 
 // Latin sentences end at punctuation followed by a space (so 12.90 € stays whole); CJK ones need no space.
 const SENTENCE = /(?<=[.!?])\s+|(?<=[。！？])\s*/u;
@@ -92,9 +93,10 @@ function grounded(text, d) {
  * @param menu       the normalised menu the picks refer to
  * @param opts.restrictions  restrictions to enforce (full list in the browser)
  * @param opts.allowedRefs   ids that evidence may cite (preferences + restrictions); null skips the check
+ * @param opts.session       the session context; "session" evidence is dropped when nothing was said
  * @returns a new recommendation with a `guard` report: { removed: [{dishId, reason}], droppedEvidence, strippedClaims }
  */
-export function guardRecommendation(recs, menu, { restrictions = [], allowedRefs = null } = {}) {
+export function guardRecommendation(recs, menu, { restrictions = [], allowedRefs = null, session = null } = {}) {
   const byId = new Map(menu.dishes.map((d) => [d.id, d]));
   const flagged = screenRestrictions(menu, { restrictions });
   const report = { removed: [], droppedEvidence: 0, strippedClaims: 0 };
@@ -118,6 +120,7 @@ export function guardRecommendation(recs, menu, { restrictions = [], allowedRefs
       const cites = e.type === 'preference' || e.type === 'restriction';
       if (cites && (!e.ref || (allowedRefs && !allowedRefs.has(e.ref)))) { report.droppedEvidence++; continue; }
       if (e.type === 'menu' && !grounded(e.text, d)) { report.droppedEvidence++; continue; }
+      if (e.type === 'session' && isEmptySession(session)) { report.droppedEvidence++; continue; }
       const [text, n] = scrub(e.text, d); report.strippedClaims += n;
       if (text) evidence.push({ ...e, text }); else report.droppedEvidence++;
     }
@@ -139,9 +142,11 @@ export function guardRecommendation(recs, menu, { restrictions = [], allowedRefs
   }
 
   const [orderingTip, n3] = scrub(recs.orderingTip, null);
+  const [changeNote, n5] = scrub(recs.changeNote, null);
+  report.strippedClaims += n5;
   const [headline, n4] = scrub(recs.headline, null);
   report.strippedClaims += n3 + n4;
-  return { ...recs, headline: headline ?? '', picks, cautions, orderingTip: orderingTip || null, guard: report };
+  return { ...recs, headline: headline ?? '', picks, cautions, orderingTip: orderingTip || null, changeNote: changeNote || null, guard: report };
 }
 
 /** The ids evidence may cite, from what was actually submitted. */
