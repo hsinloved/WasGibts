@@ -1,6 +1,7 @@
-import { h, mount, toast, plural } from '../dom.js';
+import { h, mount, toast, plural, fmtDate } from '../dom.js';
 import { api, readFiles, passcode } from '../api.js';
 import { session } from '../store.js';
+import { menuHistory } from '../menu-history.js';
 import { OCCASIONS } from '/shared/model.js';
 import { normalizeMenu, priceLabel, dishSnapshot, dishText, STYLE_ATTRIBUTES } from '/shared/menu.js';
 import { screenRestrictions } from '/shared/recommend.js';
@@ -27,7 +28,11 @@ const state = {
   refineText: '',
   ...session.get(), // menu, recs survive reloads
 };
-const persist = () => session.set({ menu: state.menu, recs: state.recs, occasion: state.occasion, request: state.request, link: state.link, refine: state.refine, change: state.change });
+const persist = () => {
+  session.set({ menu: state.menu, recs: state.recs, occasion: state.occasion, request: state.request, link: state.link, refine: state.refine, change: state.change, historyId: state.historyId });
+  // Keep this menu and its latest picks in the device's menu history.
+  if (state.menu && state.recs) state.historyId = menuHistory.save({ menu: state.menu, recs: state.recs, occasion: state.occasion, refine: state.refine, id: state.historyId }) ?? state.historyId;
+};
 
 const PLATFORM_RX = /(lieferando|thuisbezorgd|just-eat|takeaway\.com|wolt\.com|ubereats|deliveroo|foodora|foodpanda)/i;
 const PLATFORM_NAMES = { lieferando: 'Lieferando', thuisbezorgd: 'Thuisbezorgd', 'just-eat': 'Just Eat', 'takeaway.com': 'Takeaway', 'wolt.com': 'Wolt', ubereats: 'Uber Eats', deliveroo: 'Deliveroo', foodora: 'foodora', foodpanda: 'foodpanda' };
@@ -95,6 +100,7 @@ export function renderRead(root, ctx) {
       h('p.lede', {}, 'Photograph the menu, paste a link or share screenshots. I’ll translate it and pick a few dishes for you.'),
     ),
     !compact && sourceForm(ctx, rerender),
+    !compact && !state.busy && recentMenus(ctx, rerender),
     state.busy && progress(),
     state.error && h('p.error', { role: 'alert' }, state.error),
     state.menu && !state.busy && results(ctx, rerender),
@@ -229,6 +235,29 @@ function sourceForm(ctx, rerender) {
   );
 }
 
+/** Menus read before, reopened instantly from this device (no fetching, no AI). */
+function recentMenus(ctx, rerender) {
+  const list = menuHistory.list();
+  if (!list.length) return null;
+  const open = (e) => {
+    Object.assign(state, { menu: e.menu, recs: e.recs, occasion: e.occasion ?? state.occasion, refine: e.refine ?? emptySession(), change: null, historyId: e.id, editing: false, error: null });
+    session.set({ menu: e.menu, recs: e.recs, occasion: state.occasion, refine: state.refine, change: null, historyId: e.id });
+    rerender(); window.scrollTo({ top: 0 });
+  };
+  return h('section.recent-menus', { 'aria-label': 'Menus you read before' },
+    h('div.recent-head', {},
+      h('h2.section-title', {}, 'Menus you read before'),
+      h('button.ghost.small', { type: 'button', onclick: () => { if (confirm('Forget all saved menus on this device? Your journal and taste profile stay.')) { menuHistory.clear(); rerender(); } } }, 'Clear')),
+    h('ul.recent-list', {}, list.map((e) => h('li.recent', {},
+      h('button.recent-open', { type: 'button', onclick: () => open(e) },
+        h('span.recent-name', {}, e.name),
+        h('span.recent-meta', {}, [fmtDate(e.at), e.cuisine, plural(e.dishes, 'dish', 'dishes')].filter(Boolean).join(' · ')),
+        e.topPicks.length > 0 && h('span.recent-picks', {}, `Picked: ${e.topPicks.join(', ')}`)),
+      h('button.ghost.small.recent-x', { type: 'button', 'aria-label': `Forget ${e.name}`, onclick: () => { menuHistory.remove(e.id); rerender(); } }, '×'),
+    ))),
+    h('p.hint', {}, 'Saved on this device only. Opening one doesn’t fetch or read the menu again; tap “Update picks” after opening if your taste has changed.'));
+}
+
 async function readMenu(ctx, rerender) {
   state.error = null;
   try {
@@ -262,6 +291,7 @@ async function readMenu(ctx, rerender) {
       state.menu = normalizeMenu(await api.extract(source, { translateTo, glossLanguages, homeCity }));
     }
     state.recs = null;
+    state.historyId = null;
     state.editing = false;
     // A new menu starts a new session; the "anything today?" text seeds it.
     state.refine = state.request.trim() ? applyStatement(emptySession(), state.request).session : emptySession();
@@ -477,6 +507,7 @@ function pickCard(ctx, d, p, i) {
     h('div.pick-num', { 'aria-hidden': 'true' }, h('span', {}, String(i + 1))),
     h('article', {},
       h('p.eyebrow.accent', {}, p.role),
+      i < 2 && d.image && dishPhoto(d),
       h('header.dish-head', {},
         h('div', {}, h('h3.dish-name', {}, d.originalName), d.translatedName && h('p.dish-trans', {}, d.translatedName), glosses(d)),
         priceLabel(d) && h('p.price', {}, priceLabel(d)),
@@ -494,6 +525,13 @@ function pickCard(ctx, d, p, i) {
       ),
     ),
   );
+}
+
+/** The restaurant's own photo of the dish (top picks only). Hidden if it fails to load. */
+function dishPhoto(d) {
+  return h('figure.dish-photo', {},
+    h('img', { src: d.image, alt: d.translatedName || d.originalName, loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', onerror: (e) => e.currentTarget.closest('figure')?.remove() }),
+    h('figcaption', {}, 'Photo from the restaurant'));
 }
 
 const evidenceLabel = (t) => ({ preference: 'Your taste', history: 'Past order', restriction: 'Restriction', menu: 'Menu', occasion: 'Occasion' }[t] ?? t);

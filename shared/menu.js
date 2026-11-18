@@ -48,6 +48,8 @@ export function normalizeDish(d, i) {
     attributes: strs(d.attributes).filter((a) => ATTRIBUTES.includes(a)),
     dietary: { menuStated: strs(d.dietary?.menuStated), likely: strs(d.dietary?.likely) },
     uncertainty: str(d.uncertainty),
+    // A photo from the restaurant's own page (https only), or null.
+    image: typeof d.image === 'string' && /^https:\/\/[^\s"'<>]+$/.test(d.image) && d.image.length < 1000 ? d.image : null,
   };
 }
 

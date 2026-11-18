@@ -14,6 +14,7 @@ import { partsFromFiles, SourceError } from './lib/sources.js';
 import { resolveLinkSource } from './lib/resolve.js';
 import { normalizeMenu } from './shared/menu.js';
 import { normalizeSession } from './shared/session.js';
+import { attachPhotos } from './lib/photos.js';
 
 const PORT = Number(process.env.PORT) || 8890;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -29,7 +30,7 @@ const HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Frame-Options': 'DENY',
-  'Content-Security-Policy': "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://focbzehvucxetphfxzbm.supabase.co wss://focbzehvucxetphfxzbm.supabase.co; object-src 'none'; base-uri 'none'",
+  'Content-Security-Policy': "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://focbzehvucxetphfxzbm.supabase.co wss://focbzehvucxetphfxzbm.supabase.co; object-src 'none'; base-uri 'none'",
 };
 
 const clip = (v, n) => String(v ?? '').slice(0, n);
@@ -139,6 +140,7 @@ const routes = {
       homeCity,
     });
     const menu = normalizeMenu({ ...raw, source: { kind: input.kind, label: input.label, url: input.url } });
+    menu.dishes = attachPhotos(menu.dishes, input.images);
     menu.notes.unshift(...(input.notes ?? []));
     if (input.truncated) menu.notes.push('The page was very long; only the first part was read.');
     if (!menu.dishes.length) throw new HttpError(422, menu.notes[0] || 'No dishes found in that source.');
