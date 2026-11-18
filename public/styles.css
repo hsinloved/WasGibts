@@ -772,6 +772,11 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
 .combo-dishes { font-weight: 700; margin: 0 0 .25rem; }
 .combo-dishes .plus { color: var(--paprika); }
 
+/* The restaurant's own dish photo on the top picks. */
+.dish-photo { margin: .4rem 0 .75rem; }
+.dish-photo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: var(--outline) solid var(--ink); border-radius: 14px; background: var(--paper-2); }
+.dish-photo figcaption { font-family: var(--mono); font-size: .7rem; letter-spacing: .04em; color: var(--muted); margin-top: .25rem; }
+
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
   body { font-size: 1.0625rem; padding-bottom: 0; }
