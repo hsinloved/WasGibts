@@ -736,7 +736,17 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
   :root:not([data-theme="light"]) .staff, :root:not([data-theme="light"]) .staff-name { color: #171412; }
   :root:not([data-theme="light"]) .pick-num, :root:not([data-theme="light"]) nav a[aria-current="true"] { color: #171412; }
   :root:not([data-theme="light"]) .chip.on { color: #171412; }
+  /* Stickers cast a dark shadow on a dark page, not a cream one; the main
+     button keeps its own colour as the edge instead of a cream outline. */
+  :root:not([data-theme="light"]) button.primary:not(:disabled) { border-color: var(--paprika); box-shadow: 0 3px 0 #000; }
+  :root:not([data-theme="light"]) button.primary:not(:disabled):active { box-shadow: 0 1px 0 #000; }
+  :root:not([data-theme="light"]) .refine { border-color: var(--ink-2); box-shadow: 0 3px 0 #000; }
+  /* The order bar is yolk in both themes: give its controls light-theme ink. */
+  :root:not([data-theme="light"]) .order-bar { --ink: #171412; --ink-2: #3a332c; --paper: #fff4dc; --paper-2: #f3e6c8; --control-line: #171412; }
 }
+:root[data-theme="dark"] button.primary:not(:disabled) { color: #171412; border-color: var(--paprika); box-shadow: 0 3px 0 #000; }
+:root[data-theme="dark"] .refine { border-color: var(--ink-2); box-shadow: 0 3px 0 #000; }
+:root[data-theme="dark"] .order-bar { --ink: #171412; --ink-2: #3a332c; --paper: #fff4dc; --paper-2: #f3e6c8; --control-line: #171412; color: #171412; }
 
 /* Refine my picks: a sticker-edged panel between the headline and the picks. */
 .refine { margin: 0 0 1.25rem; padding: .9rem 1rem 1rem; border: var(--outline) solid var(--ink); border-radius: 20px; background: var(--paper); box-shadow: 0 3px 0 var(--ink); }
@@ -768,7 +778,17 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
 .combo:nth-child(3n+1) { background: color-mix(in srgb, var(--yolk) 22%, var(--paper)); }
 .combo-name { font-family: var(--mono); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 .25rem; }
 .combo-dishes { font-weight: 700; margin: 0 0 .25rem; }
-.combo-dishes .plus { color: var(--paprika); }
+
+/* Phones: short nav labels so tabs fit; the full name stays for screen readers. */
+.nav-short { display: none; }
+@media (max-width: 39.99rem) {
+  nav .nav-full { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  nav .nav-short { display: inline; }
+}
+
+/* A field and the buttons that submit it never touch. */
+.field + .actions, .field + .hint + .actions { margin-top: 1rem; }
+.combo-dishes .plus { color: var(--ink); }
 
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
