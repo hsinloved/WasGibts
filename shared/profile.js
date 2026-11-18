@@ -307,15 +307,21 @@ export const isEmerging = (pref) => pref.origin === 'inferred' && pref.status !=
 
 // --- Views --------------------------------------------------------------------
 
+/** Does a preference apply on this occasion? Untied ones always do; tied ones only on their occasions. */
+export const appliesTo = (pref, occasion) => !pref.contexts.length || Boolean(occasion && pref.contexts.includes(occasion));
+
 /**
  * The compact view of a profile that is sent to the AI layer. The profile
  * itself never leaves the device except through this function.
  */
 export function profileForAI(profile, { occasion } = {}) {
-  const prefs = profile.preferences
-    .filter((p) => p.status !== 'dismissed')
-    .filter((p) => !isEmerging(p))
-    .filter((p) => !p.contexts.length || !occasion || p.contexts.includes(occasion))
+  const usable = profile.preferences.filter((p) => p.status !== 'dismissed' && !isEmerging(p));
+  // Same rule as the local matcher (shared/recommend.js): a preference tied to
+  // occasions only counts when the occasion is known and is one of them. With
+  // no occasion it may only help decide whether to ask; it is listed apart,
+  // by subject only, so it can never be cited as a reason for a pick.
+  const prefs = usable
+    .filter((p) => appliesTo(p, occasion))
     .map((p) => ({
       id: p.id,
       [p.polarity]: p.subject,
@@ -343,11 +349,16 @@ export function profileForAI(profile, { occasion } = {}) {
       ...(h.note ? { note: h.note } : {}),
     }));
 
+  const occasionDependent = occasion ? [] : usable
+    .filter((p) => p.contexts.length)
+    .map((p) => ({ [p.polarity]: p.subject, onlyFor: p.contexts }));
+
   return {
     about: profile.about.notes || undefined,
     homeCity: profile.settings.homeCity || undefined,
     guidance: profile.guidance.length ? profile.guidance : undefined,
     preferences: prefs,
+    ...(occasionDependent.length ? { occasionDependent } : {}),
     restrictions,
     restrictionsWithheld: !profile.settings.shareRestrictionsWithAI && profile.restrictions.length > 0,
     recentOrders: recent,

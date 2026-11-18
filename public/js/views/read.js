@@ -5,6 +5,7 @@ import { OCCASIONS } from '/shared/model.js';
 import { normalizeMenu, priceLabel, dishSnapshot, STYLE_ATTRIBUTES } from '/shared/menu.js';
 import { profileForAI } from '/shared/profile.js';
 import { recommendLocally, screenRestrictions } from '/shared/recommend.js';
+import { guardRecommendation, allowedRefsFrom } from '/shared/guard.js';
 
 const state = {
   tab: 'photos',
@@ -311,6 +312,14 @@ async function refreshPicks(ctx, rerender) {
     state.recs = recommendLocally(state.menu, profile, { occasion: state.occasion });
     state.recs.fallbackReason = err.message;
   }
+  // Always, whatever produced the picks: enforce every restriction (including
+  // ones kept private from the AI) and drop evidence the profile can't back.
+  const fallbackReason = state.recs.fallbackReason;
+  state.recs = guardRecommendation(state.recs, state.menu, {
+    restrictions: profile.restrictions,
+    allowedRefs: allowedRefsFrom(profileForAI(profile, { occasion: state.occasion }), profile.restrictions),
+  });
+  if (fallbackReason) state.recs.fallbackReason = fallbackReason;
   endSteps();
   persist();
   rerender();
@@ -345,6 +354,7 @@ function results(ctx, rerender) {
         h('p.headline', {}, recs.headline),
         h('p.engine', {}, recs.engine === 'ai' ? 'Picked by the AI from your taste profile.' : 'Picked by the built-in matcher (exact matches with your profile only).'),
         recs.fallbackReason && h('p.error.small', {}, `The AI couldn’t help this time (${recs.fallbackReason}), so these come from the built-in matcher.`),
+        guardNote(recs, byId),
       ),
       h('ol.pick-list', {}, recs.picks.map((p, i) => {
         const d = byId.get(p.dishId);
@@ -378,6 +388,15 @@ function results(ctx, rerender) {
       )),
     ),
   );
+}
+
+/** Tell the diner when the safety guard took a pick out (see shared/guard.js). */
+function guardNote(recs, byId) {
+  const removed = (recs.guard?.removed ?? []).filter((r) => r.kind === 'restriction');
+  if (!removed.length) return null;
+  return h('p.callout.small.guard-note', {},
+    `Left out ${removed.length === 1 ? 'one dish' : `${removed.length} dishes`} because of your restrictions: `,
+    removed.map((r) => `${byId.get(r.dishId)?.originalName ?? r.dishId} (${r.reason})`).join('; '), '.');
 }
 
 function pickCard(ctx, d, p, i) {
