@@ -477,6 +477,7 @@ function pickCard(ctx, d, p, i) {
     h('div.pick-num', { 'aria-hidden': 'true' }, h('span', {}, String(i + 1))),
     h('article', {},
       h('p.eyebrow.accent', {}, p.role),
+      i < 2 && d.image && dishPhoto(d),
       h('header.dish-head', {},
         h('div', {}, h('h3.dish-name', {}, d.originalName), d.translatedName && h('p.dish-trans', {}, d.translatedName), glosses(d)),
         priceLabel(d) && h('p.price', {}, priceLabel(d)),
@@ -494,6 +495,13 @@ function pickCard(ctx, d, p, i) {
       ),
     ),
   );
+}
+
+/** The restaurant's own photo of the dish (top picks only). Hidden if it fails to load. */
+function dishPhoto(d) {
+  return h('figure.dish-photo', {},
+    h('img', { src: d.image, alt: d.translatedName || d.originalName, loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', onerror: (e) => e.currentTarget.closest('figure')?.remove() }),
+    h('figcaption', {}, 'Photo from the restaurant'));
 }
 
 const evidenceLabel = (t) => ({ preference: 'Your taste', history: 'Past order', restriction: 'Restriction', menu: 'Menu', occasion: 'Occasion' }[t] ?? t);

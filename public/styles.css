@@ -645,7 +645,9 @@ nav a[aria-current="true"] { background: radial-gradient(closest-side, var(--yol
 .display, .display-s { font-family: var(--display); font-style: normal; font-weight: 400; letter-spacing: 0; line-height: 1.02; }
 .display { font-size: clamp(2.3rem, 9vw, 4.2rem); }
 .display-s { font-size: clamp(1.7rem, 6vw, 2.4rem); }
-.headline { font-family: var(--heading); font-style: normal; font-size: 1.35rem; line-height: 1.25; }
+/* The headline is a sentence, often in Chinese: a reading face, not the display
+   fonts (Titan One / Mantou Sans are for short labels and would smear here). */
+.headline { font-family: var(--sans); font-weight: 650; font-style: normal; font-size: 1.15rem; line-height: 1.5; letter-spacing: 0; }
 .section-title, .dish-name, .pref-subject, .staff-name, .tray .section-title { font-family: var(--heading); font-weight: 400; font-style: normal; letter-spacing: .005em; }
 .dish-name { font-size: 1.5rem; line-height: 1.15; }
 .dish-trans, .dish-row .trans, .pref-note, .culture, .quote, .verdict .note { font-family: var(--sans); }
@@ -776,6 +778,10 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
 .member-list { list-style: none; margin: .25rem 0 1rem; padding: 0; display: grid; gap: .35rem; }
 .invite-code { font-family: var(--mono); font-size: 1.8rem; letter-spacing: .18em; margin: .25rem 0; color: var(--ink); }
 .account-line { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: 1.5rem; }
+/* The restaurant's own dish photo on the top picks. */
+.dish-photo { margin: .4rem 0 .75rem; }
+.dish-photo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: var(--outline) solid var(--ink); border-radius: 14px; background: var(--paper-2); }
+.dish-photo figcaption { font-family: var(--mono); font-size: .7rem; letter-spacing: .04em; color: var(--muted); margin-top: .25rem; }
 
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
