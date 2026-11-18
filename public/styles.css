@@ -1,29 +1,38 @@
-/* WasGibts — "Quiet Provenance". A field notebook: warm paper, iron-gall ink,
-   one earthen accent that marks only choices. Newsreader for reading,
-   Instrument Serif italic for the few large gestures, DM Mono for clinical
-   labels, Inter for running interface text. See docs/DESIGN.md.
+/* WasGibts — "Loud Appetite". The menu board as a shout: fat rounded display
+   letters with one black outline weight, flat colour served straight from the
+   tin (rice-paper cream, paprika, egg yolk, deep green, ink), dish names
+   wrapped on a diagonal, and sticker circles. Bagel Fat One for the big
+   gestures, Titan One for headings and controls, Inter for reading, DM Mono
+   for small labels. The ●/○ provenance marks and the 0.70 confidence line
+   keep their meaning. See docs/DESIGN.md.
 
    Mobile first: the base rules are the phone layout (one column, 44px touch
    targets, navigation in the thumb zone, safe-area insets). Wider screens are
    layered on in the min-width blocks at the very end, which must stay last. */
 
 :root {
-  --paper: #f1ece2;
-  --paper-2: #e9e3d6;
-  --ink: #22201e;
-  --ink-2: #4a4641;
-  --muted: #68625b;
-  --rule: #d6cebf;         /* decorative hairlines only */
-  --control-line: #857d71; /* outlines of things you can tap: 3:1 or more */
-  --accent: #9f452c;       /* terracotta: marks a choice, never fills a field */
-  --accent-soft: #efe0d6;
-  --positive: #3f6b4a;
-  --negative: #8a4b2a;
-  --serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --paper: #fff4dc;         /* rice-paper cream */
+  --paper-2: #fbe7bf;
+  --ink: #171412;
+  --ink-2: #3d352d;
+  --muted: #655a4e;
+  --rule: #e3cfa6;          /* decorative lines only */
+  --control-line: #7c6f5e;  /* outlines of things you can tap: 3:1 or more */
+  --accent: #b8331a;        /* paprika for text: 4.9:1 or more on cream */
+  --accent-soft: #ffe8ad;
+  --paprika: #e94a2b;       /* paprika for fills, under ink text */
+  --yolk: #ffc72c;
+  --green: #185c54;
+  --on-green: #fff4dc;
+  --positive: #2f6b3f;
+  --negative: #a5381c;
+  --outline: 3px;           /* the one outline weight */
+  --serif: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --display: 'Instrument Serif', 'Newsreader', Georgia, serif;
+  --display: 'Bagel Fat One', 'Titan One', system-ui, sans-serif;
+  --heading: 'Titan One', 'Bagel Fat One', system-ui, sans-serif;
   --mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
-  --grain-opacity: .05;
+  --grain-opacity: 0;       /* flat colour: no grain */
   --measure: 42rem;
   --wide: 60rem;
   --radius: 4px;
@@ -36,15 +45,15 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #161513; --paper-2: #1f1d1a; --ink: #ece6da; --ink-2: #c9c2b5; --muted: #948c7f;
-    --rule: #34302a; --control-line: #716a60; --accent: #e08a6d; --accent-soft: #2e211b; --positive: #8fbf98; --negative: #e0a07a;
-    --grain-opacity: .07; color-scheme: dark;
+    --paper: #171412; --paper-2: #24201c; --ink: #fff4dc; --ink-2: #e8dcc4; --muted: #b9ac97;
+    --rule: #3a332c; --control-line: #7d7262; --accent: #ff7a57; --accent-soft: #3a2a10; --positive: #8fcf9e; --negative: #ff9a7a;
+    --paprika: #ff7a57; --green: #12423d; --grain-opacity: 0; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --paper: #161513; --paper-2: #1f1d1a; --ink: #ece6da; --ink-2: #c9c2b5; --muted: #948c7f;
-  --rule: #34302a; --control-line: #716a60; --accent: #e08a6d; --accent-soft: #2e211b; --positive: #8fbf98; --negative: #e0a07a;
-  --grain-opacity: .07; color-scheme: dark;
+  --paper: #171412; --paper-2: #24201c; --ink: #fff4dc; --ink-2: #e8dcc4; --muted: #b9ac97;
+  --rule: #3a332c; --control-line: #7d7262; --accent: #ff7a57; --accent-soft: #3a2a10; --positive: #8fcf9e; --negative: #ff9a7a;
+  --paprika: #ff7a57; --green: #12423d; --grain-opacity: 0; color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -344,7 +353,8 @@ label.button { position: relative; }
 
 
 /* =============================================================================
-   Quiet Provenance layer — the visual language of the poster in design/.
+   Base layer (from "Quiet Provenance"): provenance marks, meter, structure.
+   Colours and type here are overridden by the Loud Appetite layer below.
    Solid mark = observed (on the menu); hollow mark = assumed (typical).
    One dashed threshold at 0.70: the ceiling of the unconfirmed.
    ============================================================================= */
@@ -589,6 +599,132 @@ details.what[open] > summary::before, details.today[open] > summary::before, .fe
 .unlock .error, .unlock .hint { grid-column: 1 / -1; margin: 0; }
 .unlock .error:empty { display: none; }
 
+/* =============================================================================
+   Loud Appetite layer — the menu board as a shout. Flat colour, one ink outline
+   weight (--outline), fat rounded letters, sticker circles. Layout, touch sizes
+   and the ●/○ provenance marks are untouched; this only restyles them.
+   Above the wide-screen blocks on purpose: those must stay last.
+   ============================================================================= */
+
+/* Masthead: a full-bleed green band, then the wrapper of dish names. */
+.masthead {
+  background: var(--green); color: var(--on-green); border-bottom: 0; position: relative;
+}
+/* Full-bleed green behind the header. A pseudo-element, not clip-path: clip-path
+   would also clip the fixed tab bar, which lives inside the header. */
+.masthead::before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(50% - 50vw); right: calc(50% - 50vw); background: var(--green); z-index: -1; }
+html { overflow-x: clip; }   /* 100vw can exceed the layout width by a scrollbar */
+.wordmark { font: 400 2rem/1 var(--display); letter-spacing: .01em; color: var(--on-green); }
+.wrapper-band {
+  height: 3.5rem; background: var(--green) url('/band.png') left center / auto 100% repeat-x;
+  border-top: var(--outline) solid var(--ink); border-bottom: var(--outline) solid var(--ink);
+}
+
+/* Bottom tab bar: cream with an ink rule; the active tab is a yolk pill. */
+nav { border-top: var(--outline) solid var(--ink); font-family: var(--heading); font-weight: 400; letter-spacing: .04em; }
+nav a { color: var(--ink-2); }
+nav a[aria-current="true"] { color: var(--ink); }
+nav a[aria-current="true"]::before { content: ''; display: none; }
+nav a[aria-current="true"] { background: radial-gradient(closest-side, var(--yolk) 0 calc(100% - 1px), transparent 100%) center / 88% 62% no-repeat; }
+.count:not(:empty) { font-family: var(--heading); background: var(--paprika); color: var(--ink); border: 2px solid var(--ink); border-radius: 1em; }
+
+/* Type: big gestures in Bagel, headings in Titan, reading in Inter. */
+.display, .display-s { font-family: var(--display); font-style: normal; font-weight: 400; letter-spacing: 0; line-height: 1.02; }
+.display { font-size: clamp(2.3rem, 9vw, 4.2rem); }
+.display-s { font-size: clamp(1.7rem, 6vw, 2.4rem); }
+.headline { font-family: var(--heading); font-style: normal; font-size: 1.35rem; line-height: 1.25; }
+.section-title, .dish-name, .pref-subject, .staff-name, .tray .section-title { font-family: var(--heading); font-weight: 400; font-style: normal; letter-spacing: .005em; }
+.dish-name { font-size: 1.5rem; line-height: 1.15; }
+.dish-trans, .dish-row .trans, .pref-note, .culture, .quote, .verdict .note { font-family: var(--sans); }
+.eyebrow { font-family: var(--heading); font-weight: 400; letter-spacing: .08em; }
+.eyebrow.accent { color: var(--accent); }
+.lede { font-family: var(--sans); }
+
+/* Menu-board rules: section titles sit between two heavy bars. */
+.menu-section-title {
+  font-family: var(--heading); font-weight: 400; color: var(--ink); letter-spacing: .1em;
+  padding: .45rem 0; border-top: var(--outline) solid var(--ink); border-bottom: var(--outline) solid var(--ink);
+}
+.dish-row .orig { font-family: var(--heading); font-weight: 400; }
+.results, .full-menu { border-top-width: var(--outline); }
+
+/* Controls: pills with the ink outline; press = a little sticker lift. */
+button, .button {
+  font-family: var(--heading); font-weight: 400; letter-spacing: .03em; border-radius: 999px;
+  border: var(--outline) solid var(--ink); color: var(--ink); background: var(--paper);
+  transition: transform .08s ease, box-shadow .08s ease, background .15s;
+}
+button.primary { background: var(--paprika); color: var(--ink); border-color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+button.primary:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); background: var(--paprika); }
+@media (hover: hover) { button.primary:hover { background: var(--yolk); border-color: var(--ink); } }
+button.primary:disabled, button.primary:disabled:hover { background: var(--paper-2); color: var(--muted); border-color: var(--control-line); box-shadow: none; transform: none; opacity: 1; }
+button.ghost, .button.ghost { border-color: var(--ink); color: var(--ink); }
+button.danger { color: var(--negative); border-color: var(--negative); }
+button.confirm { border-color: var(--positive); color: var(--positive); }
+.chip { font-family: var(--heading); font-weight: 400; border-radius: 999px; border: 2px solid var(--ink); color: var(--ink); background: var(--paper); }
+.chip.on, .feedback .chip.on, .ask .chip.on { background: var(--yolk); color: var(--ink); border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.chip.positive.on { background: #cfe7c4; color: var(--ink); border-color: var(--ink); box-shadow: none; }
+.chip.negative.on { background: #ffd2c4; color: var(--ink); border-color: var(--ink); box-shadow: none; }
+.tabs button { font-family: var(--heading); font-weight: 400; border-radius: 0; border: 0; border-bottom: 3px solid transparent; background: none; }
+.tabs button.on { border-bottom-color: var(--paprika); }
+input[type="text"], input[type="url"], input[type="password"], input:not([type]), select { border-bottom: var(--outline) solid var(--ink); }
+textarea { border: var(--outline) solid var(--ink); border-radius: 14px; background: var(--paper); }
+
+/* Pick cards: cream cards, ink outline, a yolk sticker number. */
+.pick {
+  border: var(--outline) solid var(--ink); border-radius: 20px; background: var(--paper);
+  padding: 1.1rem 1rem 1rem; margin-bottom: 1rem; box-shadow: 0 4px 0 var(--ink);
+}
+.pick-list > .pick:first-child { border-top-color: var(--ink); }
+.pick-num { font: 400 1.15rem/1 var(--heading); color: var(--ink); }
+.pick-num span { background: var(--yolk); border: var(--outline) solid var(--ink); transform: rotate(-8deg); }
+.concerns, .feedback, .pref-form, .proposal, .tray, .callout, .ask, .cautions { border-radius: 18px; }
+.callout { background: var(--accent-soft); border: var(--outline) solid var(--ink); border-left-width: var(--outline); }
+.concerns { background: var(--paper-2); }
+.culture { border-left: 4px solid var(--paprika); }
+
+/* Order tray and sticky order bar: the yolk moment. */
+.tray { border: var(--outline) solid var(--ink); background: var(--paper); box-shadow: 0 4px 0 var(--ink); }
+.order-bar { background: var(--yolk); border-top: var(--outline) solid var(--ink); }
+.order-bar-sum { font-family: var(--heading); font-weight: 400; color: var(--ink); }
+.order-bar .price { color: var(--ink); }
+.order-bar-mark::before { content: '●'; color: var(--paprika); }
+.order-bar button.ghost { background: var(--paper); }
+
+/* Progress steps keep their marks, now in the brand colours. */
+.step.done .step-mark { background: var(--ink); }
+.step.now .step-mark { border-color: var(--paprika); box-shadow: inset 0 0 0 2.5px var(--paper), inset 0 0 0 10px var(--paprika); }
+.steps { font-family: var(--heading); font-weight: 400; }
+
+/* Profile and journal accents. */
+.meter-ceiling { border-left-color: var(--ink); }
+.optional, .badge { border-radius: 999px; border: 2px solid var(--ink); color: var(--ink); }
+.entry.waiting .entry-meta::before { color: var(--paprika); }
+summary.pref-main::after { color: var(--ink); }
+details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
+
+/* Toast and staff view. */
+#toast { border-radius: 16px; border: var(--outline) solid var(--ink); background: var(--ink); color: var(--paper); }
+.staff { background: var(--yolk); color: var(--ink); }
+.staff-name { color: var(--ink); }
+.staff-sub { color: var(--ink-2); }
+.staff-close { background: var(--ink); color: var(--yolk); border-radius: 999px; }
+
+/* Colophon: a green footer band to close the page. */
+.colophon { border-top: var(--outline) solid var(--ink); }
+.colophon-mark { color: var(--ink-2); font-family: var(--heading); font-weight: 400; }
+
+/* Dark mode: the wrapper and stickers stay; surfaces turn to ink. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pick, :root:not([data-theme="light"]) .tray { box-shadow: 0 4px 0 #000; border-color: var(--ink-2); }
+  :root:not([data-theme="light"]) button.primary:not(:disabled) { color: #171412; }
+  :root:not([data-theme="light"]) .order-bar, :root:not([data-theme="light"]) .order-bar-sum,
+  :root:not([data-theme="light"]) .order-bar .price { color: #171412; }
+  :root:not([data-theme="light"]) .staff, :root:not([data-theme="light"]) .staff-name { color: #171412; }
+  :root:not([data-theme="light"]) .pick-num, :root:not([data-theme="light"]) nav a[aria-current="true"] { color: #171412; }
+  :root:not([data-theme="light"]) .chip.on { color: #171412; }
+}
+
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
   body { font-size: 1.0625rem; padding-bottom: 0; }
@@ -622,6 +758,11 @@ details.what[open] > summary::before, details.today[open] > summary::before, .fe
   body:has(.order-bar:not(:empty)) #toast { bottom: calc(var(--order-h) + 1rem); }
   .submit-bar { position: static; margin-inline: 0; padding: 0; border-top: 0; background: none; }
   .submit-bar { display: flex; }
+  nav { border-top: 0; }
+  nav a { color: var(--on-green); }
+  nav a[aria-current="true"] { color: #171412; padding: .35rem .9rem; border-radius: 999px; background: var(--yolk); }
+  .wordmark { font-size: 2.4rem; }
+  .wrapper-band { height: 4.5rem; }
   .submit-bar > * { width: auto; }
   .feedback-actions { display: flex; }
   .feedback-actions > * { width: auto; }
