@@ -2,10 +2,10 @@ import { h, mount, toast, plural } from '../dom.js';
 import { api, readFiles, passcode } from '../api.js';
 import { session } from '../store.js';
 import { OCCASIONS } from '/shared/model.js';
-import { normalizeMenu, priceLabel, dishSnapshot, STYLE_ATTRIBUTES } from '/shared/menu.js';
+import { normalizeMenu, priceLabel, dishSnapshot, dishText, STYLE_ATTRIBUTES } from '/shared/menu.js';
 import { screenRestrictions } from '/shared/recommend.js';
 import { choosePicks } from '/shared/pipeline.js';
-import { emptySession, applyStatement, removeFromSession, describeSession, explainChange } from '/shared/session.js';
+import { emptySession, applyStatement, removeFromSession, describeSession, explainChange, sessionForAI, normalizeSession, groupMatch, labelOf } from '/shared/session.js';
 
 const state = {
   tab: 'photos',
@@ -536,7 +536,7 @@ function dishActions(ctx, d, recommended) {
   const inJournal = (action) => store.profile.history.some((x) => x.action === action && x.dish.originalName === d.originalName && x.restaurant.name === (state.menu.restaurant.name ?? null) && !x.feedbackAt && Date.now() - Date.parse(x.at) < 864e5);
   const add = async (action, e) => {
     await store.do('recordHistory', {
-      action, occasion: state.occasion, recommended,
+      action, occasion: state.occasion, recommended, context: orderContext(d),
       restaurant: { name: state.menu.restaurant.name, url: state.menu.source.url },
       dish: dishSnapshot(d),
     });
@@ -549,6 +549,14 @@ function dishActions(ctx, d, recommended) {
     h('button.small', { type: 'button', disabled: inJournal('ordered'), dataset: { order: d.originalName }, onclick: (e) => add('ordered', e) }, inJournal('ordered') ? 'Ordered ✓' : '+ Order this'),
     h('button.small.ghost', { type: 'button', disabled: inJournal('saved'), onclick: (e) => add('saved', e) }, inJournal('saved') ? 'Saved ✓' : 'Save'),
   );
+}
+
+/** What was said about this meal, in words, plus the cravings this dish answered. */
+function orderContext(d) {
+  const ctx = sessionForAI(state.refine);
+  const s = normalizeSession(state.refine);
+  return { hunger: ctx.hunger, sharing: ctx.sharing, novelty: ctx.novelty, cravings: ctx.cravings, avoid: ctx.avoidToday,
+    matched: s.cravings.filter((k) => groupMatch(k, d, dishText(d))).map(labelOf) };
 }
 
 function groupBy(list, fn) {
