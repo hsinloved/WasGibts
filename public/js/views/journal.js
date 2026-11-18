@@ -1,12 +1,12 @@
 import { h, mount, toast, fmtDate } from '../dom.js';
-import { FEEDBACK } from '/shared/model.js';
+import { FEEDBACK, OCCASIONS } from '/shared/model.js';
 import { signalsFor } from '/shared/profile.js';
 
 const open = new Set();   // entries whose feedback editor the user opened
 const closed = new Set(); // waiting entries the user folded away
 
 // The reactions most meals need; the specific ones sit under "More specific".
-const MAIN_FEEDBACK = ['loved', 'order_again', 'liked', 'disliked', 'not_today'];
+const MAIN_FEEDBACK = ['loved', 'order_again', 'liked', 'right_for_moment', 'disliked', 'not_today'];
 
 export function renderJournal(root, ctx) {
   const { store } = ctx;
@@ -41,6 +41,7 @@ function journalEntry(ctx, entry, rerender, isNext) {
     h('div.entry-meta', {}, fmtDate(entry.at), ' · ', statusLabel, entry.recommended ? ' · recommended' : '', entry.restaurant.name ? ` · ${entry.restaurant.name}` : ''),
     h('h3.dish-name.s', {}, entry.dish.originalName),
     entry.dish.translatedName && h('p.dish-trans', {}, entry.dish.translatedName),
+    contextLine(entry),
     entry.feedback.length > 0 && !open.has(entry.id) && h('p.verdict', {},
       entry.feedback.map((t) => h('span.chip.static', { class: FEEDBACK[t].tone }, FEEDBACK[t].label)),
       entry.note && h('span.note', {}, ` “${entry.note}”`)),
@@ -55,6 +56,14 @@ function journalEntry(ctx, entry, rerender, isNext) {
       }, 'Remove'),
     ),
   );
+}
+
+/** "While: already eaten · craving something starchy": the meal's context, for the record. */
+function contextLine(entry) {
+  const c = entry.context;
+  if (!c) return null;
+  const bits = [c.hunger, c.sharing, c.novelty, ...c.cravings.map((x) => `craving ${x}`), ...c.avoid.map((x) => `no ${x}`)].filter(Boolean);
+  return bits.length ? h('p.small.muted.entry-context', {}, `While: ${bits.join(' · ')}`) : null;
 }
 
 function feedbackEditor(ctx, entry, rerender) {
@@ -108,17 +117,23 @@ function feedbackEditor(ctx, entry, rerender) {
 function teaches(tags, entry, profile) {
   if (!tags.length) return h('p.small.muted', {}, 'Nothing selected — your profile won’t change.');
   const lines = [];
+  const notes = [];
   for (const t of tags) {
-    const sigs = signalsFor(t, entry.dish);
+    const sigs = signalsFor(t, entry.dish, entry);
     if (!sigs.length) lines.push(`“${FEEDBACK[t].label}” is noted on this entry only.`);
     for (const s of sigs) {
       const dismissed = profile.preferences.some((p) => p.status === 'dismissed' && p.polarity === s.polarity && p.subject.toLowerCase() === s.subject.toLowerCase());
-      lines.push(`${s.polarity === 'like' ? 'You might like' : 'You might not enjoy'} ${s.subject}${dismissed ? ' (you dismissed this before; it stays dismissed)' : ''}`);
+      const scope = s.scope === 'moment' ? (s.contexts.length ? ` — ${OCCASIONS[s.contexts[0]].label.toLowerCase()} only, not its ingredients` : ' — this dish only, not its ingredients') : '';
+      lines.push(`${s.polarity === 'like' ? 'You might like' : 'You might not enjoy'} ${s.subject}${scope}${dismissed ? ' (you dismissed this before; it stays dismissed)' : ''}`);
     }
   }
+  const craving = entry.context?.matched ?? [];
+  const spreads = tags.some((t) => FEEDBACK[t].effects.some((e) => e.target === 'dish-attributes'));
+  if (craving.length && spreads) notes.push(`You ordered this while craving ${craving.join(' and ')}, so it counts half as a sign of lasting taste.`);
   return h('div.teaches', {},
     h('p.small', {}, 'This will add evidence for:'),
     h('ul.small', {}, [...new Set(lines)].map((l) => h('li', {}, l))),
+    notes.map((n) => h('p.small', {}, n)),
     h('p.small.muted', {}, 'These stay suggestions until you confirm them in your profile.'));
 }
 

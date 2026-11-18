@@ -178,3 +178,13 @@ The guard drops any combination that contains a dish it removed or an unknown di
 General taste (profile), the current craving, hunger, sharing and familiar-vs-adventurous are separate inputs. Nothing optimises calories or protein unless the diner asks; "more protein" is a craving like any other.
 
 The browser's whole pick path (AI → fallback → guard → session) is `shared/pipeline.js` (`choosePicks`), so the behavioural scenarios in `test/scenarios.test.js` exercise exactly what the diner sees.
+
+## Feedback: lasting taste vs. the moment
+
+- Ordering a dish stores the meal's **context** on the history entry (`makeOrderContext`): hunger, sharing, novelty, cravings, "not today", and `matched` (the cravings this dish answered), all as plain words. Entries made before this have `context: null`. The journal shows it ("While: craving something starchy").
+- **Craving discount:** "I loved this" / "It was good" on a dish that answered a craving spread **half** their usual weight to its ingredients and style. The evidence note says so ("ordered while craving something starchy; counts half"). "I'd order it again" is about the dish itself and is not discounted.
+- **"Right for the moment"** (`right_for_moment`) says the choice suited the occasion, not that its ingredients are liked:
+  - it creates or strengthens a **dish-level** like scoped to the entry's occasion (`contexts: [occasion]`), with no ingredient or style spread;
+  - with no occasion, it counts half and stays unscoped.
+- The AI's `recentOrders` carry `orderedWhileCraving` and `occasion`, so it does not read a craving as lasting taste.
+- Everything stays reversible and inspectable: each piece of evidence carries its history id and a note. Changing the feedback replaces it, and deleting the entry withdraws it. Inferred preferences remain suggestions until confirmed and can be dismissed.
