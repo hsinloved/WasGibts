@@ -1,26 +1,33 @@
-# Design: Quiet Provenance
+# Design: Loud Appetite
 
-WasGibts looks like a page of field notes: things observed are kept visibly apart from things assumed. That is the same rule the data model follows.
+*Replaces "Quiet Provenance". The meanings below (●/○ provenance marks, the 0.70 confidence ceiling, the mobile-first rules) are unchanged; only the look is new.*
+
+The menu board as a shout: fat rounded letters, one ink outline weight, flat colour served straight from the tin, dish names wrapped on a diagonal, and sticker circles. Inspired by the energy of playful retro food-brand identities, with its own palette, emblem and type, not copied from any one brand.
+
+- **Palette:** rice-paper cream `#fff4dc`, ink `#171412`, paprika `#e94a2b` (fills; text uses `--accent` `#b8331a`, 5.4:1 on cream), egg yolk `#ffc72c`, deep green `#185c54`. Dark mode swaps the surfaces to ink and keeps yolk and paprika.
+- **Type:** *Bagel Fat One* for the wordmark and page titles, *Titan One* for headings, dish names, buttons and chips, *Inter* for reading, *DM Mono* for small labels.
+- **Chinese and Japanese in headings and dish names:** *Mantou Sans* (饅頭黑體, OFL, based on Dela Gothic One), self-hosted in `public/fonts/` and served **unmodified**, because its licence reserves the name for unmodified copies (so no subsetting). Its `unicode-range` means the 2.7 MB file only downloads on screens that show those characters, and it is cached for a year. It covers Traditional Chinese fully. Simplified characters it lacks (鱼 鸡 锅 …) fall back to *Noto Sans SC Black* from Google Fonts, which is served in small slices. Reading text stays in the system font.
+- **Shapes:** one outline weight (`--outline`, 3px). Buttons and chips are pills. Pick cards and the order tray are cream cards with an ink outline and a 4px ink drop. Pick numbers are yolk stickers tilted −8°. Menu sections sit between two heavy rules.
+- **Brand moments:** the green header with the diagonal wrapper of dish names (`public/band.png`), the yolk tab pill, the yolk order bar, the yolk staff view. The emblem is a bowl with chopsticks (favicon and app icons).
+
+## Meaning marks (unchanged)
 
 | element | means | where |
 |---|---|---|
 | **● solid dot** | stated on the menu (`source: menu`) | ingredients and preparation (`.stated`) |
 | **○ hollow dot**, italic | typical, assumed (`source: typical`) | ingredients, preparation, "probably" dietary notes (`.typical`) |
 | **dashed line at 0.70** | the ceiling for patterns you haven't confirmed (`INFERRED_CAP`) | confidence line under each preference (`.meter`) |
-| **terracotta ring** | a choice: a pick, the open dish, the selected chip | `.pick-num`, `.chip.on`, focus |
+| **yolk sticker / pill** | a choice: a pick number, the selected chip, the active tab | `.pick-num`, `.chip.on`, `nav a[aria-current]` |
 
-## Materials
+## Contrast floors (WCAG)
 
-- **Paper** `#f1ece2` with a faint, even SVG grain. **Ink** `#22201e` in two strengths. **Accent** terracotta `#9f452c`, used to mark choices and never to fill an area. Dark mode keeps the same roles.
-- **Type:** *Instrument Serif* italic for the few large gestures (wordmark, page titles, headline). *Newsreader* for reading. *DM Mono* for labels, buttons, chips, prices and dates. *Inter* for running interface text.
-- Corners are square and dividers are hairline rules. No shadows.
-- **Contrast floors (WCAG):** body and muted text at least 4.5:1 on every surface (`--muted` `#68625b`, accent `#9f452c`). Anything you can tap is outlined in `--control-line` (3:1 or more); `--rule` is for decorative hairlines only.
+Body and muted text at least 4.5:1 on every surface (`--muted` `#655a4e`, `--accent` `#b8331a`). Bright paprika (`--paprika`) is only a fill under ink text (4.8:1). Anything you can tap is outlined in ink or `--control-line` (3:1 or more); `--rule` is decorative only.
 
 ## Mobile first
 
-Base rules are the phone layout; the two `min-width: 40rem` blocks at the very end of `styles.css` add the wide-screen layout and **must stay last**, so add new rules above them. Touch targets get their 44px from `min-height: var(--tap)`, not padding. The bottom tab bar's height is `--nav-h`; the active tab is marked with a terracotta ● via `aria-current`. The paper grain sits at `z-index: -1` and nothing else sets a stacking context on the page shell, so the fixed tab bar stays above content. No text below 12px (`.75rem`).
+Base rules are the phone layout; the two `min-width: 40rem` blocks at the very end of `styles.css` add the wide-screen layout and **must stay last**, so add new rules above them. Touch targets get their 44px from `min-height: var(--tap)`, not padding. The bottom tab bar's height is `--nav-h`; the active tab is a yolk pill via `aria-current`. The full-bleed green behind the header is a `::before` at `z-index: -1` (not `clip-path`, which would clip the fixed tab bar inside the header), and nothing sets a stacking context on the page shell, so the tab bar stays above content. No text below 12px (`.75rem`).
 
-- **Progress** while a menu is read is a short list of steps in the same marks: ● done, a ringed terracotta dot for the current step, ○ still to come (`.steps`, announced through `role="status"`).
+- **Progress** while a menu is read is a short list of steps in the same marks: ● done, a ringed paprika dot for the current step, ○ still to come (`.steps`, announced through `role="status"`).
 - **Order bar:** once you order a dish, a bar fixed above the tab bar shows how many dishes, the total, *View* and *Show to staff*. Its height is `--order-h`; the page padding and the toast stack above it via `body:has(.order-bar:not(:empty))`. It steps aside (`.tucked`) while the full order tray is on screen.
 - **Profile rows** are their own disclosure: the name, meta and confidence line are the `<summary>` (marked `+` / `−`). Edit, Delete and the evidence sit inside. Only the call to action stays outside: *That's me / Not me* on suggestions, *Restore* on dismissed items.
 
@@ -30,7 +37,7 @@ The width comes from a 5 % bucket class (`.meter-fill.w0` … `.w100`) because t
 
 ## Icons
 
-`public/favicon.svg` and `icon-192/512.png` show the "chosen" mark: a terracotta ring around a solid ink dot. It sits inside the 80 % maskable safe zone.
+`public/favicon.svg` and `icon-192/512.png` show the emblem: a paprika bowl with chopsticks on a yolk sticker, on green. It sits inside the 80 % maskable safe zone.
 
 ## Results first
 
