@@ -80,6 +80,12 @@ const termsFor = (subject) => {
 const termIn = (text, t) => (t.length >= 5 ? text.includes(t)
   : new RegExp(`(^|[^\\p{L}])${escape(t)}(s|e|es)?([^\\p{L}]|$)`, 'u').test(text));
 
+/** Which restrictions a piece of text (e.g. a recipe's ingredients) runs into. */
+export function restrictionHits(text, restrictions = []) {
+  const t = String(text).toLowerCase();
+  return restrictions.filter((r) => matches(r.subject, t) || termsFor(r.subject).some((x) => termIn(t, x)));
+}
+
 export function screenRestrictions(menu, profile) {
   const out = new Map();
   for (const d of menu.dishes) {

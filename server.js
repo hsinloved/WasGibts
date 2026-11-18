@@ -8,11 +8,13 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { extractMenu, recommend, parseProfile, aiInfo, aiAvailable, AIError } from './lib/ai.js';
+import { extractMenu, recommend, parseProfile, recipeIdeas, aiInfo, aiAvailable, AIError } from './lib/ai.js';
+import { CUISINES } from './shared/recipes.js';
 import { partsFromFiles, SourceError } from './lib/sources.js';
 import { resolveLinkSource } from './lib/resolve.js';
 import { normalizeMenu } from './shared/menu.js';
 import { normalizeSession } from './shared/session.js';
+import { attachPhotos } from './lib/photos.js';
 
 const PORT = Number(process.env.PORT) || 8890;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -28,7 +30,7 @@ const HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Frame-Options': 'DENY',
-  'Content-Security-Policy': "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'",
+  'Content-Security-Policy': "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://focbzehvucxetphfxzbm.supabase.co wss://focbzehvucxetphfxzbm.supabase.co; object-src 'none'; base-uri 'none'",
 };
 
 const clip = (v, n) => String(v ?? '').slice(0, n);
@@ -138,6 +140,7 @@ const routes = {
       homeCity,
     });
     const menu = normalizeMenu({ ...raw, source: { kind: input.kind, label: input.label, url: input.url } });
+    menu.dishes = attachPhotos(menu.dishes, input.images);
     menu.notes.unshift(...(input.notes ?? []));
     if (input.truncated) menu.notes.push('The page was very long; only the first part was read.');
     if (!menu.dishes.length) throw new HttpError(422, menu.notes[0] || 'No dishes found in that source.');
@@ -170,6 +173,24 @@ const routes = {
       session: normalizeSession(body.session),
       previous: (Array.isArray(body.previous) ? body.previous : []).slice(0, 5).map((x) => clip(x, 40)),
       screen: Array.isArray(body.screen) ? body.screen.slice(0, 50) : [],
+    });
+  },
+
+  'POST /api/recipes/ideas': async (req) => {
+    requireAI();
+    requirePasscode(req);
+    rateLimit(req);
+    const body = await readJson(req, LIMITS.default);
+    const cuisine = CUISINES.includes(body.cuisine) ? body.cuisine : clip(body.cuisine, 40).trim();
+    if (!cuisine) throw new HttpError(400, 'Pick a cuisine.');
+    const list = (v, n) => (Array.isArray(v) ? v : []).slice(0, n);
+    return recipeIdeas({
+      cuisine,
+      request: clip(body.request, 300),
+      count: Math.max(1, Math.min(6, Number(body.count) || 4)),
+      restrictions: list(body.restrictions, 30).map((r) => ({ type: clip(r?.type, 20), subject: clip(r?.subject, 60), severity: r?.severity === 'strict' ? 'strict' : 'flexible' })).filter((r) => r.subject),
+      dislikes: list(body.dislikes, 40).map((d) => clip(d, 60)).filter(Boolean),
+      language: clip(body.language, 60) || 'English',
     });
   },
 

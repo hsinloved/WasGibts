@@ -1,0 +1,283 @@
+// Kitchen: the shared side of WasGibts. Sign in, start or join a household
+// (the cook and the person eating the boxes), invite someone, and choose to
+// share your restrictions with the cook. Recipe ideas and the weekly boxes
+// build on this. Everything else in the app works without signing in.
+
+import { h, mount, toast } from '../dom.js';
+import * as cloud from '../cloud.js';
+import { api } from '../api.js';
+import { CUISINES } from '/shared/recipes.js';
+
+const ui = { step: 'email', email: '', code: '', busy: false, error: null, user: undefined, households: null, members: [], invite: null, shared: null, name: '', joinCode: '', listening: false, cuisine: 'Taiwanese', wish: '', ideas: null, removed: [], saved: null, filter: 'All', savedIds: new Set(), plan: null, boxes: [], openBox: null, unwatch: null };
+
+export function renderKitchen(root, ctx) {
+  const rerender = () => { if (location.hash.startsWith('#/kitchen')) renderKitchen(root, ctx); };
+  ui.redraw = rerender;
+  if (!ui.listening) {
+    ui.listening = true;
+    cloud.onAuthChange(async (user) => { ui.user = user; ui.households = null; await load(ctx); rerender(); }).catch((e) => { ui.error = e.message; rerender(); });
+  }
+  if (ui.user === undefined) {
+    mount(root, intro(), h('p.muted', {}, 'Loading…'));
+    load(ctx).then(rerender);
+    return;
+  }
+  const home = ui.households?.[0] ?? null;
+  mount(root,
+    intro(),
+    ui.error && h('p.error', { role: 'alert' }, ui.error),
+    !ui.user ? signIn(rerender)
+      : !home ? startOrJoin(ctx, rerender)
+        : household(ctx, home, rerender),
+  );
+}
+
+/** The latest week's boxes, with live updates while this tab is open. */
+async function loadPlan(householdId, plan = undefined) {
+  ui.plan = plan === undefined ? await cloud.latestPlan(householdId) : plan;
+  ui.boxes = ui.plan ? await cloud.boxes(ui.plan.id) : [];
+  if (ui.plan && ui.watching !== ui.plan.id) {
+    ui.unwatch?.();
+    ui.watching = ui.plan.id;
+    ui.unwatch = await cloud.watchPlan(ui.plan.id, async () => {
+      ui.boxes = await cloud.boxes(ui.plan.id);
+      ui.redraw?.();
+    });
+  }
+}
+
+async function load(ctx) {
+  try {
+    ui.user = await cloud.currentUser();
+    if (ui.user && ui.households === null) {
+      ui.households = await cloud.myHouseholds();
+      const home = ui.households[0];
+      if (home) {
+        ui.members = await cloud.members(home.id);
+        const shared = await cloud.sharedRestrictions(home.id);
+        ui.shared = shared.find((r) => r.user_id === ui.user.id) ?? null;
+        ui.everyone = shared;
+        ui.saved = await cloud.listRecipes(home.id);
+        await loadPlan(home.id);
+      }
+    }
+    ui.error = null;
+  } catch (e) { ui.error = e.message; ui.user ??= null; }
+}
+
+function intro() {
+  return h('section.intro', {},
+    h('p.eyebrow', {}, 'Kitchen'),
+    h('h1.display', {}, 'Cook for two'),
+    h('p.lede', {}, 'Plan weekend meal-prep boxes and share them with the person eating them. They see what’s in box 1, 2, 3… on their own phone.'));
+}
+
+const busy = async (rerender, fn) => {
+  ui.busy = true; ui.error = null; rerender();
+  try { await fn(); } catch (e) { ui.error = e.message; }
+  ui.busy = false; rerender();
+};
+
+function signIn(rerender) {
+  if (ui.step === 'code') {
+    return h('form.block.kitchen-card', { onsubmit: (e) => { e.preventDefault(); busy(rerender, async () => { await cloud.verifyCode(ui.email, ui.code); ui.households = null; }); } },
+      h('h2.section-title', {}, 'Check your email'),
+      h('p', {}, `I sent a sign-in email to ${ui.email}. Type the 6-digit code from it, or tap the link in the email on this device.`),
+      h('label.field', {}, h('span', {}, 'Code'),
+        h('input', { type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 10, required: true, value: ui.code, oninput: (e) => { ui.code = e.target.value; } })),
+      h('div.actions', {},
+        h('button.primary', { type: 'submit', disabled: ui.busy }, ui.busy ? 'Checking…' : 'Sign in'),
+        h('button.ghost', { type: 'button', onclick: () => { ui.step = 'email'; ui.code = ''; rerender(); } }, 'Use another email')));
+  }
+  return h('form.block.kitchen-card', { onsubmit: (e) => { e.preventDefault(); busy(rerender, async () => { await cloud.sendCode(ui.email); ui.step = 'code'; }); } },
+    h('h2.section-title', {}, 'Sign in'),
+    h('p.muted', {}, 'Only needed for the shared kitchen. Your taste profile, journal and menus stay on this device.'),
+    h('label.field', {}, h('span', {}, 'Email'),
+      h('input', { type: 'email', autocomplete: 'email', required: true, value: ui.email, oninput: (e) => { ui.email = e.target.value; } })),
+    h('div.actions', {}, h('button.primary', { type: 'submit', disabled: ui.busy }, ui.busy ? 'Sending…' : 'Email me a code')));
+}
+
+function startOrJoin(ctx, rerender) {
+  return h('div', {},
+    h('form.block.kitchen-card', { onsubmit: (e) => { e.preventDefault(); busy(rerender, async () => { await cloud.createHousehold('Our kitchen', ui.name); ui.households = null; await load(ctx); }); } },
+      h('h2.section-title', {}, 'I’m the cook'),
+      h('p.muted', {}, 'Start a kitchen, then invite the person you cook for.'),
+      nameField(),
+      h('div.actions', {}, h('button.primary', { type: 'submit', disabled: ui.busy }, 'Start our kitchen'))),
+    h('form.block.kitchen-card', { onsubmit: (e) => { e.preventDefault(); busy(rerender, async () => { await cloud.joinHousehold(ui.joinCode, ui.name); ui.households = null; await load(ctx); toast('You’re in. Boxes will show up here.'); }); } },
+      h('h2.section-title', {}, 'I got an invite code'),
+      nameField(),
+      h('label.field', {}, h('span', {}, 'Invite code'),
+        h('input', { type: 'text', autocapitalize: 'characters', maxlength: 12, required: true, value: ui.joinCode, oninput: (e) => { ui.joinCode = e.target.value; } })),
+      h('div.actions', {}, h('button.primary', { type: 'submit', disabled: ui.busy }, 'Join'))),
+    accountLine(rerender));
+}
+
+const nameField = () => h('label.field', {}, h('span', {}, 'Your name (shown to the other person)'),
+  h('input', { type: 'text', maxlength: 60, autocomplete: 'given-name', value: ui.name, oninput: (e) => { ui.name = e.target.value; } }));
+
+function household(ctx, home, rerender) {
+  const me = ui.user.id;
+  const share = cloud.restrictionsToShare(ctx.store.profile);
+  return h('div', {},
+    boxesBlock(ctx, home, rerender),
+    ideasBlock(ctx, home, rerender),
+    savedBlock(home, rerender),
+    h('section.block.kitchen-card', {},
+      h('h2.section-title', {}, home.name),
+      h('ul.member-list', {}, ui.members.map((m) => h('li', {},
+        h('strong', {}, m.display_name || (m.user_id === me ? 'You' : 'Someone')),
+        ' · ', m.role === 'cook' ? 'cooks' : 'eats the boxes', m.user_id === me ? ' (you)' : ''))),
+      ui.invite
+        ? h('div.invite', {},
+          h('p', {}, 'Invite code (single use, valid 7 days):'),
+          h('p.invite-code', {}, ui.invite.code),
+          h('p.small.muted', {}, 'They open WasGibts → Kitchen, sign in with their own email, choose “I got an invite code” and type this.'),
+          navigator.share && h('button.small', { type: 'button', onclick: () => navigator.share({ text: `Join my WasGibts kitchen: open ${location.origin}/#/kitchen, sign in, and enter the code ${ui.invite.code}` }).catch(() => {}) }, 'Send it'))
+        : h('button', { type: 'button', disabled: ui.busy, onclick: () => busy(rerender, async () => { ui.invite = await cloud.createInvite(home.id); }) }, 'Invite someone')),
+
+    h('section.block.kitchen-card', {},
+      h('h2.section-title', {}, 'Share my restrictions with the cook'),
+      h('p.muted', {}, 'So recipe ideas avoid what you can’t or won’t eat. Only these are shared, never the rest of your taste profile.'),
+      share.restrictions.length || share.dislikes.length
+        ? h('ul.small', {}, [
+          ...share.restrictions.map((r) => h('li', {}, `${r.subject} (${r.type}${r.severity === 'strict' ? ', strict' : ''})`)),
+          share.dislikes.length > 0 && h('li', {}, `Would rather avoid: ${share.dislikes.join(', ')}`),
+        ])
+        : h('p.small', {}, 'Nothing to share yet: add allergies or dislikes in your Taste profile.'),
+      h('div.actions', {},
+        h('button', { type: 'button', disabled: ui.busy, onclick: () => busy(rerender, async () => { await cloud.shareRestrictions(home.id, ctx.store.profile); ui.shared = { updated_at: new Date().toISOString() }; toast('Shared with your kitchen.'); }) }, ui.shared ? 'Update what I share' : 'Share these'),
+        ui.shared && h('button.ghost', { type: 'button', disabled: ui.busy, onclick: () => busy(rerender, async () => { await cloud.stopSharingRestrictions(home.id); ui.shared = null; }) }, 'Stop sharing')),
+      ui.shared && h('p.small.muted', {}, 'Shared. Update after you change your restrictions.')),
+
+        accountLine(rerender, home));
+}
+
+function accountLine(rerender, home = null) {
+  return h('p.small.muted.account-line', {},
+    `Signed in as ${ui.user.email}. `,
+    h('button.ghost.small', { type: 'button', onclick: () => busy(rerender, async () => { await cloud.signOut(); Object.assign(ui, { user: null, households: null, invite: null, shared: null, step: 'email', code: '' }); }) }, 'Sign out'),
+    home && h('button.ghost.small.danger', { type: 'button', onclick: () => { if (confirm(`Leave “${home.name}”? You’ll stop seeing its recipes and boxes.`)) busy(rerender, async () => { await cloud.leaveHousehold(home.id); ui.households = null; await load(); }); } }, 'Leave kitchen'));
+}
+
+// --- Recipe ideas ----------------------------------------------------------------------
+
+function ideasBlock(ctx, home, rerender) {
+  const restrictions = (ui.everyone ?? []).flatMap((x) => x.restrictions ?? []);
+  const dislikes = [...new Set((ui.everyone ?? []).flatMap((x) => x.dislikes ?? []))];
+  const ask = () => busy(rerender, async () => {
+    if (!ctx.ai.available) throw new Error(ctx.ai.locked ? 'Enter the passcode on the Read a menu tab first; recipe ideas use the same AI.' : 'Recipe ideas need the AI, which isn’t set up on this server.');
+    const out = await api.recipeIdeas({ cuisine: ui.cuisine, request: ui.wish, count: 4, restrictions, dislikes, language: ctx.store.profile.settings.translateTo });
+    ui.ideas = out.ideas; ui.removed = out.removed;
+  });
+  return h('section.block.kitchen-card', {},
+    h('h2.section-title', {}, 'Recipe ideas'),
+    h('p.muted', {}, 'Easy, healthy dishes that keep in the fridge and reheat well.'),
+    h('div.chips', { role: 'group', 'aria-label': 'Cuisine' }, CUISINES.map((c) => h('button', {
+      type: 'button', class: `chip${ui.cuisine === c ? ' on' : ''}`, 'aria-pressed': String(ui.cuisine === c), onclick: () => { ui.cuisine = c; rerender(); },
+    }, c))),
+    h('label.field', {}, h('span', {}, 'Anything in particular? (optional)'),
+      h('input', { type: 'text', maxlength: 300, placeholder: 'e.g. more fish, no deep frying, vegetarian lunch', value: ui.wish, oninput: (e) => { ui.wish = e.target.value; } })),
+    (restrictions.length > 0 || dislikes.length > 0) && h('p.small.muted', {}, `Avoiding: ${[...restrictions.map((r) => r.subject), ...dislikes].join(', ')} (shared by your kitchen).`),
+    h('div.actions', {}, h('button.primary', { type: 'button', disabled: ui.busy, onclick: ask }, ui.busy ? 'Thinking…' : `Get ${ui.cuisine} ideas`)),
+    ui.removed.length > 0 && h('p.small.callout', {}, `Left out because of a restriction: ${ui.removed.map((r) => `${r.title} (${r.reason})`).join('; ')}.`),
+    ui.ideas && h('ul.recipe-list', {}, ui.ideas.map((r) => recipeCard(r, {
+      action: ui.savedIds.has(r.title) ? h('button.small', { type: 'button', disabled: true }, 'Saved ✓')
+        : h('button.small', { type: 'button', disabled: ui.busy, onclick: () => busy(rerender, async () => { await cloud.saveRecipe(home.id, r); ui.savedIds.add(r.title); ui.saved = await cloud.listRecipes(home.id); }) }, 'Save'),
+    }))));
+}
+
+function savedBlock(home, rerender) {
+  const list = ui.saved ?? [];
+  if (!list.length) return null;
+  const cuisines = ['All', ...new Set(list.map((r) => r.cuisine))];
+  const shown = ui.filter === 'All' ? list : list.filter((r) => r.cuisine === ui.filter);
+  return h('section.block.kitchen-card', {},
+    h('h2.section-title', {}, `Saved recipes (${list.length})`),
+    cuisines.length > 2 && h('div.chips.scroll-row', {}, cuisines.map((c) => h('button', { type: 'button', class: `chip${ui.filter === c ? ' on' : ''}`, onclick: () => { ui.filter = c; rerender(); } }, c))),
+    h('ul.recipe-list', {}, shown.map((r) => recipeCard(r, {
+      action: h('button.small.ghost.danger', { type: 'button', disabled: ui.busy, onclick: () => { if (confirm(`Delete “${r.title}”?`)) busy(rerender, async () => { await cloud.deleteRecipe(r.id); ui.saved = await cloud.listRecipes(home.id); }); } }, 'Delete'),
+    }))));
+}
+
+/** One recipe: the essentials up front, ingredients and steps folded. */
+export function recipeCard(r, { action = null } = {}) {
+  return h('li.recipe', {},
+    h('p.eyebrow', {}, [r.cuisine, r.activeMinutes ? `${r.activeMinutes} min` : null, r.servings ? `${r.servings} portions` : null].filter(Boolean).join(' · ')),
+    h('h3.dish-name.s', {}, r.title),
+    r.titleOriginal && r.titleOriginal !== r.title && h('p.dish-trans', {}, r.titleOriginal),
+    r.summary && h('p', {}, r.summary),
+    h('p.small.keeps', {}, `Keeps ${r.keepsDays} day${r.keepsDays === 1 ? '' : 's'} in the fridge. ${r.reheat ?? ''}`),
+    r.allergens?.length > 0 && h('p.small.muted', {}, `Contains: ${r.allergens.join(', ')}`),
+    r.flags?.length > 0 && h('p.small.concern-line', {}, r.flags.join(' · ')),
+    h('details.what', {},
+      h('summary', {}, 'Ingredients & steps'),
+      h('ul.small', {}, (r.ingredients ?? []).map((i) => h('li', {}, [i.amount, i.item].filter(Boolean).join(' ')))),
+      h('ol.small', {}, (r.steps ?? []).map((st) => h('li', {}, st))),
+      r.whyItBoxesWell && h('p.small.muted', {}, r.whyItBoxesWell),
+      r.storage && h('p.small.muted', {}, r.storage)),
+    action && h('div.actions', {}, action));
+}
+
+// --- This week's boxes ------------------------------------------------------------------
+
+const VERDICTS = { loved: 'Loved it', fine: 'It was fine', not_again: 'Not again' };
+const day = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+const addDays = (iso, n) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+
+function boxesBlock(ctx, home, rerender) {
+  const me = ui.user.id;
+  const names = new Map(ui.members.map((m) => [m.user_id, m.user_id === me ? 'You' : (m.display_name || 'They')]));
+  const thisWeekend = cloud.prepDay();
+  const start = () => busy(rerender, async () => { await loadPlan(home.id, await cloud.planFor(home.id, thisWeekend)); });
+  if (!ui.plan) {
+    return h('section.block.kitchen-card', {},
+      h('h2.section-title', {}, 'This week’s boxes'),
+      h('p.muted', {}, 'Number your meal-prep boxes 1 to 6 and put a saved recipe in each. Whoever eats them sees what’s inside, how to reheat it and when to eat it by.'),
+      h('div.actions', {}, h('button.primary', { type: 'button', disabled: ui.busy, onclick: start }, 'Start this weekend’s boxes')));
+  }
+  const byNo = new Map(ui.boxes.map((b) => [b.boxNo, b]));
+  return h('section.block.kitchen-card', {},
+    h('h2.section-title', {}, `Boxes · ${day(ui.plan.week_of)}`),
+    ui.plan.week_of < thisWeekend && h('p.small.muted', {}, 'These are from an earlier weekend. ',
+      h('button.ghost.small', { type: 'button', disabled: ui.busy, onclick: start }, 'Start this weekend’s')),
+    h('ol.box-grid', {}, [1, 2, 3, 4, 5, 6].map((n) => {
+      const b = byNo.get(n);
+      const mine = b?.ratings.find((r) => r.user_id === me);
+      return h('li', {}, h('button', {
+        type: 'button', class: `box-slot${b ? '' : ' empty'}${ui.openBox === n ? ' open' : ''}`, 'aria-expanded': String(ui.openBox === n),
+        onclick: () => { ui.openBox = ui.openBox === n ? null : n; rerender(); },
+      },
+      h('span.box-no', { 'aria-hidden': 'true' }, String(n)),
+      h('span.box-title', {}, b?.recipe ? b.recipe.title : 'Empty'),
+      mine && h('span.box-verdict', {}, VERDICTS[mine.verdict])));
+    })),
+    ui.openBox && boxDetail(ctx, ui.openBox, byNo.get(ui.openBox), names, rerender));
+}
+
+function boxDetail(ctx, n, b, names, rerender) {
+  const recipes = ui.saved ?? [];
+  const choose = h('label.field', {}, h('span', {}, `What’s in box ${n}?`),
+    h('select', {
+      disabled: ui.busy,
+      onchange: (e) => busy(rerender, async () => { await cloud.setBox(ui.plan.id, n, e.target.value || null, ui.plan.week_of); ui.boxes = await cloud.boxes(ui.plan.id); }),
+    },
+    h('option', { value: '' }, recipes.length ? '— empty —' : 'Save a recipe below first'),
+    recipes.map((r) => h('option', { value: r.id, selected: b?.recipe?.id === r.id }, `${r.title} (${r.cuisine})`))));
+  if (!b?.recipe) return h('div.box-detail', {}, choose);
+  const r = b.recipe;
+  const eatBy = b.madeOn && r.keepsDays ? addDays(b.madeOn, r.keepsDays) : null;
+  const mine = b.ratings.find((x) => x.user_id === ui.user.id);
+  return h('div.box-detail', {},
+    h('p.eyebrow', {}, `Box ${n}`),
+    eatBy && h('p.eat-by', {}, `Made ${day(b.madeOn)} · eat by ${day(eatBy)}`),
+    h('ul.recipe-list', {}, recipeCard(r)),
+    h('div.box-rate', {},
+      h('p.small', {}, 'How was it?'),
+      h('div.chips', {}, Object.entries(VERDICTS).map(([v, label]) => h('button', {
+        type: 'button', class: `chip${mine?.verdict === v ? ' on' : ''}`, 'aria-pressed': String(mine?.verdict === v), disabled: ui.busy,
+        onclick: () => busy(rerender, async () => { await cloud.rate(ui.plan.id, n, v); ui.boxes = await cloud.boxes(ui.plan.id); }),
+      }, label)))),
+    b.ratings.filter((x) => x.user_id !== ui.user.id).map((x) => h('p.small.muted', {}, `${names.get(x.user_id) ?? 'Someone'}: ${VERDICTS[x.verdict]}${x.note ? ` — “${x.note}”` : ''}`)),
+    h('details.quiet', {}, h('summary', {}, 'Change what’s in this box'), choose));
+}

@@ -99,7 +99,7 @@ a, button, summary, label, select { touch-action: manipulation; }
 /* Phones: a fixed tab bar within thumb reach. */
 nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 15;
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   background: var(--paper); border-top: 1px solid var(--ink);
   font: 500 .75rem/1.2 var(--sans); letter-spacing: .04em; text-transform: uppercase;
@@ -140,7 +140,7 @@ em { font-style: italic; }
 
 .field { display: grid; gap: .35rem; }
 .field > span, legend { font: 500 .78rem/1.3 var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
-input[type="text"], input[type="url"], input[type="password"], input:not([type]), select, textarea {
+input[type="text"], input[type="email"], input[type="url"], input[type="password"], input:not([type]), select, textarea {
   width: 100%; font: 400 1rem/1.4 var(--sans); color: var(--ink); background: transparent;
   border: 0; border-bottom: 1px solid var(--ink-2); border-radius: 0; padding: .55rem 0; min-height: var(--tap);
 }
@@ -635,7 +635,7 @@ html { overflow-x: clip; }   /* 100vw can exceed the layout width by a scrollbar
 
 /* Bottom tab bar: cream with an ink rule; the active tab is a yolk pill. */
 nav { border-top: var(--outline) solid var(--ink); font-family: var(--heading); font-weight: 400; letter-spacing: .04em; }
-nav a { color: var(--ink-2); }
+nav a { color: var(--ink-2); font-size: .72rem; line-height: 1.15; }
 nav a[aria-current="true"] { color: var(--ink); }
 nav a[aria-current="true"]::before { content: ''; display: none; }
 nav a[aria-current="true"] { background: radial-gradient(closest-side, var(--yolk) 0 calc(100% - 1px), transparent 100%) center / 88% 62% no-repeat; }
@@ -645,7 +645,9 @@ nav a[aria-current="true"] { background: radial-gradient(closest-side, var(--yol
 .display, .display-s { font-family: var(--display); font-style: normal; font-weight: 400; letter-spacing: 0; line-height: 1.02; }
 .display { font-size: clamp(2.3rem, 9vw, 4.2rem); }
 .display-s { font-size: clamp(1.7rem, 6vw, 2.4rem); }
-.headline { font-family: var(--heading); font-style: normal; font-size: 1.35rem; line-height: 1.25; }
+/* The headline is a sentence, often in Chinese: a reading face, not the display
+   fonts (Titan One / Mantou Sans are for short labels and would smear here). */
+.headline { font-family: var(--sans); font-weight: 650; font-style: normal; font-size: 1.15rem; line-height: 1.5; letter-spacing: 0; }
 .section-title, .dish-name, .pref-subject, .staff-name, .tray .section-title { font-family: var(--heading); font-weight: 400; font-style: normal; letter-spacing: .005em; }
 .dish-name { font-size: 1.5rem; line-height: 1.15; }
 .dish-trans, .dish-row .trans, .pref-note, .culture, .quote, .verdict .note { font-family: var(--sans); }
@@ -680,7 +682,7 @@ button.confirm { border-color: var(--positive); color: var(--positive); }
 .chip.negative.on { background: #ffd2c4; color: var(--ink); border-color: var(--ink); box-shadow: none; }
 .tabs button { font-family: var(--heading); font-weight: 400; border-radius: 0; border: 0; border-bottom: 3px solid transparent; background: none; }
 .tabs button.on { border-bottom-color: var(--paprika); }
-input[type="text"], input[type="url"], input[type="password"], input:not([type]), select { border-bottom: var(--outline) solid var(--ink); }
+input[type="text"], input[type="email"], input[type="url"], input[type="password"], input:not([type]), select { border-bottom: var(--outline) solid var(--ink); }
 textarea { border: var(--outline) solid var(--ink); border-radius: 14px; background: var(--paper); }
 
 /* Pick cards: cream cards, ink outline, a yolk sticker number. */
@@ -789,6 +791,44 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
 /* A field and the buttons that submit it never touch. */
 .field + .actions, .field + .hint + .actions { margin-top: 1rem; }
 .combo-dishes .plus { color: var(--ink); }
+
+/* Kitchen: sign-in, household and sharing cards. */
+.kitchen-card { border: var(--outline) solid var(--ink); border-radius: 20px; padding: 1rem 1.1rem; background: var(--paper); margin: 0 0 1rem; }
+.kitchen-card .section-title { margin-top: 0; }
+.member-list { list-style: none; margin: .25rem 0 1rem; padding: 0; display: grid; gap: .35rem; }
+.invite-code { font-family: var(--mono); font-size: 1.8rem; letter-spacing: .18em; margin: .25rem 0; color: var(--ink); }
+.account-line { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: 1.5rem; }
+/* Menus read before: a list of sticker rows under the form. */
+.recent-menus { margin: 1.75rem 0 1rem; }
+.recent-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.recent-list { list-style: none; margin: .5rem 0; padding: 0; display: grid; gap: .6rem; }
+.recent { display: flex; align-items: stretch; gap: .5rem; }
+.recent-open { flex: 1; min-width: 0; text-align: left; display: grid; gap: .15rem; padding: .7rem 1rem; border: var(--outline) solid var(--ink); border-radius: 16px; background: var(--paper); }
+.recent-open { font-family: var(--sans); font-weight: 400; letter-spacing: 0; }
+.recent-name { font-family: var(--heading); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-meta, .recent-picks { font-size: .82rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-x { flex: 0 0 auto; min-width: var(--tap); }
+/* The restaurant's own dish photo on the top picks. */
+.dish-photo { margin: .4rem 0 .75rem; }
+.dish-photo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: var(--outline) solid var(--ink); border-radius: 14px; background: var(--paper-2); }
+.dish-photo figcaption { font-family: var(--mono); font-size: .7rem; letter-spacing: .04em; color: var(--muted); margin-top: .25rem; }
+
+.recipe-list { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: .9rem; }
+.recipe { border: 2px solid var(--ink); border-radius: 16px; padding: .8rem 1rem; background: var(--paper); }
+.recipe .keeps { margin: .35rem 0; }
+
+/* Weekly boxes: six numbered sticker slots. */
+.box-grid { list-style: none; margin: .5rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+.box-slot { width: 100%; min-height: 5.5rem; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; align-items: center; column-gap: .6rem; text-align: left;
+  padding: .6rem .7rem; border: var(--outline) solid var(--ink); border-radius: 16px; background: var(--paper); font-family: var(--sans); font-weight: 600; letter-spacing: 0; }
+.box-slot.empty { border-style: dashed; color: var(--muted); font-weight: 400; }
+.box-slot.open { background: color-mix(in srgb, var(--yolk) 30%, var(--paper)); }
+.box-no { grid-row: 1 / span 2; width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--ink); background: var(--yolk); color: #171412; font-family: var(--heading); font-size: 1.1rem; }
+.box-title { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
+.box-verdict { font-family: var(--mono); font-size: .7rem; font-weight: 400; color: var(--green); }
+.box-detail { margin-top: 1rem; padding-top: .8rem; border-top: 2px dashed var(--ink); }
+.eat-by { font-weight: 700; margin: .2rem 0 .6rem; }
+.box-rate { margin-top: .8rem; }
 
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
