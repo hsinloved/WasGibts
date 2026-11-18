@@ -7,7 +7,7 @@
 // suggested pattern, a past order, or a word on the menu.
 
 import { FEEDBACK, OCCASIONS, subjectKey, confidenceLabel } from './model.js';
-import { isEmerging, isUnverifiedPrior } from './profile.js';
+import { isEmerging, isUnverifiedPrior, appliesTo } from './profile.js';
 import { dishText } from './menu.js';
 
 const OCCASION_RULES = {
@@ -98,9 +98,7 @@ export function screenRestrictions(menu, profile) {
 export function recommendLocally(menu, profile, context = {}) {
   const occasion = context.occasion in OCCASIONS ? context.occasion : null;
   const rules = OCCASION_RULES[occasion] ?? { plus: [], minus: [] };
-  const prefs = profile.preferences.filter(
-    (p) => p.status !== 'dismissed' && !isEmerging(p) && (!p.contexts.length || (occasion && p.contexts.includes(occasion))),
-  );
+  const prefs = profile.preferences.filter((p) => p.status !== 'dismissed' && !isEmerging(p) && appliesTo(p, occasion));
   const flagged = screenRestrictions(menu, profile);
   const orderedAgain = new Map(
     profile.history.filter((h) => h.feedback.length).map((h) => [subjectKey(h.dish.originalName), h]),

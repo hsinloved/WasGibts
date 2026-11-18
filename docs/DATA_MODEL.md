@@ -100,7 +100,15 @@ Dish {
 Pick { dishId, role, whyYou, evidence [{type, ref, text}], concerns[], occasionFit }
 ```
 
-Every personal claim must point to a preference, restriction, past order, menu fact or occasion. If the model returns a `dishId` that does not exist, it is dropped.
+Every personal claim must point to a preference, restriction, past order, menu fact or occasion.
+
+**After generation, a deterministic guard (`shared/guard.js`) checks every result**, from the AI or the local matcher. It runs on the server, and again in the browser with the full profile, so restrictions kept private from the AI are enforced too:
+
+- A pick the restriction screen flags for a **strict** restriction is removed and listed in cautions. The results screen says which dishes were left out and why. A `dishId` that isn't on the menu is removed.
+- Evidence citing a preference or restriction must use an id that was actually submitted; `menu` evidence must name something the dish really has. Anything else is dropped. If no preference or history evidence survives, sentences claiming the diner's taste ("you love…") are removed too.
+- Sentences stating a price the menu doesn't show, or a dietary assurance the menu doesn't print ("gluten-free", "vegan", "safe for…", also in German and Chinese), are removed.
+
+Occasion-specific preferences (`contexts`) follow one rule in both layers (`appliesTo`): they count only when the occasion is known and matches. With no occasion they are sent to the AI separately as `occasionDependent`, only to decide whether to ask about the occasion, and can't be cited.
 
 ## Main user flows
 
