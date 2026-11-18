@@ -3,11 +3,9 @@ import { api, readFiles, passcode } from '../api.js';
 import { session } from '../store.js';
 import { OCCASIONS } from '/shared/model.js';
 import { normalizeMenu, priceLabel, dishSnapshot, STYLE_ATTRIBUTES } from '/shared/menu.js';
-import { profileForAI } from '/shared/profile.js';
-import { recommendLocally, screenRestrictions } from '/shared/recommend.js';
-import { guardRecommendation, allowedRefsFrom } from '/shared/guard.js';
-import { emptySession, applyStatement, removeFromSession, describeSession, isEmptySession, enforceSession, explainChange } from '/shared/session.js';
-import { dishText } from '/shared/menu.js';
+import { screenRestrictions } from '/shared/recommend.js';
+import { choosePicks } from '/shared/pipeline.js';
+import { emptySession, applyStatement, removeFromSession, describeSession, explainChange } from '/shared/session.js';
 
 const state = {
   tab: 'photos',
@@ -307,32 +305,16 @@ async function refreshPicks(ctx, rerender, { explain = false } = {}) {
   const screen = profile.settings.shareRestrictionsWithAI
     ? [...screenRestrictions(state.menu, profile)].flatMap(([dishId, hits]) => hits.map((x) => ({ dishId, restriction: x.restriction.subject, type: x.restriction.type, verifiedOnMenu: x.verified })))
     : [];
-  try {
-    if (ai.available) {
-      if (state.steps) nextStep(); else beginSteps([MATCHING]);
-      rerender();
-      state.recs = await api.recommend({
-        menu: state.menu, occasion: state.occasion, screen,
-        session: state.refine, previous: explain ? (previous?.picks ?? []).map((p) => p.dishId) : [],
-        language: profile.settings.translateTo, includeAdventurous: profile.settings.includeAdventurousPick,
-        profile: profileForAI(profile, { occasion: state.occasion }),
-      });
-    } else {
-      state.recs = recommendLocally(state.menu, profile, { occasion: state.occasion, session: state.refine });
-    }
-  } catch (err) {
-    state.recs = recommendLocally(state.menu, profile, { occasion: state.occasion, session: state.refine });
-    state.recs.fallbackReason = err.message;
-  }
-  // Always, whatever produced the picks: enforce every restriction (including
-  // ones kept private from the AI) and drop evidence the profile can't back.
-  const fallbackReason = state.recs.fallbackReason;
-  state.recs = enforceSession(guardRecommendation(state.recs, state.menu, {
-    restrictions: profile.restrictions,
-    allowedRefs: allowedRefsFrom(profileForAI(profile, { occasion: state.occasion }), profile.restrictions),
-    session: state.refine,
-  }), state.menu, state.refine, dishText);
-  if (fallbackReason) state.recs.fallbackReason = fallbackReason;
+  if (ai.available) { if (state.steps) nextStep(); else beginSteps([MATCHING]); rerender(); }
+  state.recs = await choosePicks({
+    menu: state.menu, profile, occasion: state.occasion, session: state.refine,
+    ai: ai.available ? (view) => api.recommend({
+      menu: state.menu, occasion: state.occasion, screen,
+      session: state.refine, previous: explain ? (previous?.picks ?? []).map((p) => p.dishId) : [],
+      language: profile.settings.translateTo, includeAdventurous: profile.settings.includeAdventurousPick,
+      profile: view,
+    }) : null,
+  });
   if (explain && state.change) {
     state.change.lines = explainChange(previous, state.recs, state.menu);
     state.change.note = state.recs.changeNote ?? null;
@@ -436,6 +418,7 @@ function results(ctx, rerender) {
         const d = byId.get(p.dishId);
         return d && pickCard(ctx, d, p, i);
       })),
+      combos(recs, byId),
       recs.orderingTip && h('p.tip', {}, h('strong', {}, 'Tip. '), recs.orderingTip),
       recs.cautions.length > 0 && h('aside.cautions', {},
         h('h3', {}, 'Check before ordering'),
@@ -464,6 +447,19 @@ function results(ctx, rerender) {
       )),
     ),
   );
+}
+
+/** Ways to put the order together (shared/combos.js or the AI). */
+function combos(recs, byId) {
+  const list = (recs.combos ?? []).filter((c) => c.dishIds.every((id) => byId.has(id)));
+  if (!list.length) return null;
+  return h('section.combos', { 'aria-label': 'Ways to put it together' },
+    h('h3.combos-title', {}, 'Put it together'),
+    h('ul.combo-list', {}, list.map((c) => h('li.combo', {},
+      h('p.combo-name', {}, c.title),
+      h('p.combo-dishes', {}, c.dishIds.map((id, i) => [i ? h('span.plus', { 'aria-hidden': 'true' }, ' + ') : null, h('span', {}, byId.get(id).translatedName || byId.get(id).originalName)])),
+      c.why && h('p.small.muted', {}, c.why))),
+    ));
 }
 
 /** Tell the diner when the safety guard took a pick out (see shared/guard.js). */

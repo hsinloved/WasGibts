@@ -21,10 +21,10 @@ import { subjectKey } from './model.js';
 
 /** Food groups a craving or "not today" can name, with the words that identify a dish. */
 export const FOOD_GROUPS = {
-  starchy: { noun: 'starchy food', label: 'something starchy', words: ['noodle', 'nudel', 'rice', 'reis', 'bread', 'brot', 'pita', 'naan', 'fladenbrot', 'dumpling', 'knödel', 'kloß', 'klöße', 'potato', 'kartoffel', 'pommes', 'fries', 'pasta', 'spätzle', 'spaetzle', 'pancake', 'pfannkuchen', 'semmel', 'bun', 'wrap', 'couscous', 'bulgur', 'polenta', 'gnocchi', 'risotto', 'mian', 'baozi', 'jiaozi', 'udon', 'ramen', 'pide', 'lasagne', 'lasagna'], attributes: ['filling'] },
-  protein: { noun: 'protein', label: 'more protein', words: ['chicken', 'huhn', 'hähnchen', 'hühn', 'beef', 'rind', 'pork', 'schwein', 'lamb', 'lamm', 'duck', 'ente', 'tofu', 'egg', ' ei ', 'eier', 'fish', 'fisch', 'salmon', 'lachs', 'shrimp', 'prawn', 'garnele', 'octopus', 'oktopus', 'squid', 'calamari', 'halloumi', 'feta', 'lentil', 'linsen', 'chickpea', 'kichererbse', 'bean', 'bohne', 'steak', 'schnitzel', 'braten', 'souvlaki', 'gyros', 'kebab', 'kofta', 'meat', 'fleisch', 'sausage', 'wurst', 'paneer'], attributes: ['meat-heavy', 'seafood'] },
-  vegetables: { noun: 'vegetables', label: 'vegetables', words: ['vegetable', 'veggie', 'gemüse', 'salad', 'salat', 'greens', 'spinach', 'spinat', 'aubergine', 'eggplant', 'zucchini', 'courgette', 'cucumber', 'gurke', 'bean', 'bohne', 'okra', 'cauliflower', 'blumenkohl', 'broccoli', 'brokkoli', 'pepper', 'paprika', 'tomato', 'tomate', 'mushroom', 'pilz'], attributes: ['vegetable-forward'] },
-  warm: { noun: 'warm dishes', label: 'something warm', words: ['soup', 'suppe', 'stew', 'eintopf', 'curry', 'braised', 'geschmort', 'baked', 'überbacken', 'grilled', 'gegrillt', 'roast', 'braten', 'hot pot', 'casserole', 'auflauf'], attributes: ['soup', 'braised', 'grilled', 'fried'] },
+  starchy: { noun: 'starchy food', label: 'something starchy', words: ['noodle', 'nudel', 'rice', 'reis', 'bread', 'brot', 'pita', 'naan', 'fladenbrot', 'dumpling', 'knödel', 'kloß', 'klöße', 'potato', 'kartoffel', 'pommes', 'fries', 'pasta', 'spätzle', 'spaetzle', 'pancake', 'pfannkuchen', 'semmel', 'bun', 'wrap', 'couscous', 'bulgur', 'polenta', 'gnocchi', 'risotto', 'mian', 'baozi', 'jiaozi', 'udon', 'ramen', 'pide', 'lasagne', 'lasagna'], attributes: ['filling'], wordsFirst: true },
+  protein: { noun: 'protein', label: 'more protein', words: ['chicken', 'huhn', 'hähnchen', 'hühn', 'beef', 'rind', 'pork', 'schwein', 'lamb', 'lamm', 'duck', 'ente', 'tofu', 'egg', ' ei ', 'eier', 'fish', 'fisch', 'salmon', 'lachs', 'shrimp', 'prawn', 'garnele', 'octopus', 'oktopus', 'squid', 'calamari', 'halloumi', 'feta', 'lentil', 'linsen', 'chickpea', 'kichererbse', 'bean', 'bohne', 'steak', 'schnitzel', 'braten', 'souvlaki', 'gyros', 'kebab', 'kofta', 'meat', 'fleisch', 'sausage', 'wurst', 'paneer'], attributes: ['meat-heavy', 'seafood'], wordsFirst: true },
+  vegetables: { noun: 'vegetables', label: 'vegetables', words: ['vegetable', 'veggie', 'gemüse', 'salad', 'salat', 'greens', 'spinach', 'spinat', 'aubergine', 'eggplant', 'zucchini', 'courgette', 'cucumber', 'gurke', 'bean', 'bohne', 'okra', 'cauliflower', 'blumenkohl', 'broccoli', 'brokkoli', 'mushroom', 'pilz', 'chickpea', 'kichererbse', 'lentil', 'linsen'], attributes: ['vegetable-forward'] },
+  warm: { noun: 'warm dishes', label: 'something warm', words: ['soup', 'suppe', 'stew', 'eintopf', 'curry', 'braised', 'geschmort', 'baked', 'überbacken', 'grilled', 'gegrillt', 'roast', 'braten', 'hot pot', 'casserole', 'auflauf', 'korma', 'masala', 'dal', 'dhal', 'tagine', 'gulasch', 'goulash', 'ragout', 'ragù'], attributes: ['soup', 'braised', 'grilled'], wordsFirst: true },
   sweet: { noun: 'sweets', label: 'something sweet', words: ['dessert', 'nachtisch', 'cake', 'kuchen', 'torte', 'ice cream', 'eis', 'chocolate', 'schoko', 'baklava', 'pudding', 'strudel', 'kaiserschmarrn', 'crêpe', 'crepe', 'waffle', 'waffel', 'sweet'], attributes: ['sweet'] },
   spicy: { noun: 'spicy food', label: 'something spicy', words: ['spicy', 'scharf', 'chilli', 'chili', 'hot sauce'], attributes: ['spicy'] },
   fish: { noun: 'fish', label: 'fish', words: ['fish', 'fisch', 'salmon', 'lachs', 'tuna', 'thunfisch', 'cod', 'kabeljau', 'trout', 'forelle', 'sea bream', 'dorade', 'bream', 'bass', 'barsch', 'zander', 'pangasius', 'sardine', 'mackerel', 'makrele', 'herring', 'hering', 'swordfish', 'schwertfisch', 'fillet of', 'filet vom'], attributes: [] },
@@ -241,11 +241,11 @@ function wordIn(text, w) {
 export function groupMatch(key, d, text) {
   const g = FOOD_GROUPS[key];
   if (!g) return wordIn(text, singular(subjectKey(key))) ? subjectKey(key) : null;
-  // A named food ("noodles") says more than a label ("filling"), so try words first.
-  const word = g.words.find((w) => wordIn(text, w));
-  if (word) return word.trim();
-  const attr = g.attributes.find((a) => d.attributes.includes(a));
-  return attr ? attr.replace('-', ' ') : null;
+  // For starch, protein and warmth a named food ("noodles") says more than a
+  // label ("filling"); for the rest the extracted attribute is the better sign.
+  const attr = () => g.attributes.find((a) => d.attributes.includes(a))?.replace('-', ' ') ?? null;
+  const word = () => g.words.find((w) => wordIn(text, w))?.trim() ?? null;
+  return g.wordsFirst ? word() ?? attr() : attr() ?? word();
 }
 
 // --- After generation ------------------------------------------------------------
@@ -267,7 +267,9 @@ export function enforceSession(recs, menu, session, textOf) {
     if (!setAside.some((x) => x.dishId === d.id)) setAside.push({ dishId: d.id, reason: `no ${nounOf(key)} today` });
     return false;
   });
-  return { ...recs, picks, setAside };
+  const out = new Set(setAside.map((x) => x.dishId));
+  const combos = (recs.combos ?? []).filter((c) => !c.dishIds.some((id) => out.has(id) || (byId.get(id) && s.avoid.some((k) => groupMatch(k, byId.get(id), textOf(byId.get(id)))))));
+  return { ...recs, picks, combos, setAside };
 }
 
 /**

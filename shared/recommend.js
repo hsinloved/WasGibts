@@ -9,6 +9,7 @@
 import { FEEDBACK, OCCASIONS, subjectKey, confidenceLabel } from './model.js';
 import { isEmerging, isUnverifiedPrior, appliesTo } from './profile.js';
 import { dishText } from './menu.js';
+import { suggestCombos } from './combos.js';
 import { normalizeSession, groupMatch, labelOf, contextLabel, FOOD_GROUPS } from './session.js';
 
 const OCCASION_RULES = {
@@ -184,7 +185,8 @@ export function recommendLocally(menu, profile, context = {}) {
     for (const dim of ['hunger', 'sharing', 'novelty']) {
       const r = session[dim] && SESSION_RULES[dim][session[dim]];
       if (!r) continue;
-      const plus = r.plus.find((a) => d.attributes.includes(a));
+      // Skip what the occasion already credited, so a reason is not given twice.
+      const plus = r.plus.find((a) => d.attributes.includes(a) && !rules.plus.includes(a));
       if (plus) { score += 0.7; if (r.why) evidence.push({ type: 'session', ref: dim, text: `Fits “${contextLabel(dim, session[dim])}” today: ${plus.replace('-', ' ')}.` }); }
       const minus = r.minus.find((a) => d.attributes.includes(a));
       if (minus) { score -= 0.9; concerns.push(`${minus.replace('-', ' ')[0].toUpperCase()}${minus.replace('-', ' ').slice(1)}, which matters given ${dim === 'hunger' ? 'how hungry you are' : 'what you said'} today.`); }
@@ -261,6 +263,7 @@ export function recommendLocally(menu, profile, context = {}) {
     cautions,
     orderingTip: null,
     setAside: dedupeAside(setAside),
+    combos: suggestCombos(eligible, { session, occasion }),
     occasionQuestion: occasion ? null : 'Eating solo, sharing, or ordering in? It changes which dishes travel and share well.',
   };
 }

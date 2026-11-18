@@ -760,6 +760,16 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
 .change-lines .change-same::before { content: "="; }
 .save-suggest button { margin-left: .25rem; }
 
+/* Combinations: a row of small sticker cards under the picks. */
+.combos { margin: 1.25rem 0; }
+.combos-title { font-family: var(--heading); font-size: 1.15rem; margin: 0 0 .6rem; }
+.combo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; }
+.combo { border: var(--outline) solid var(--ink); border-radius: 18px; padding: .75rem 1rem; background: var(--paper); }
+.combo:nth-child(3n+1) { background: color-mix(in srgb, var(--yolk) 22%, var(--paper)); }
+.combo-name { font-family: var(--mono); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 .25rem; }
+.combo-dishes { font-weight: 700; margin: 0 0 .25rem; }
+.combo-dishes .plus { color: var(--paprika); }
+
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
   body { font-size: 1.0625rem; padding-bottom: 0; }
