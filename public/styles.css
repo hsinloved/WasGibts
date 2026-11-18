@@ -770,6 +770,17 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
 .combo-dishes { font-weight: 700; margin: 0 0 .25rem; }
 .combo-dishes .plus { color: var(--paprika); }
 
+/* Menus read before: a list of sticker rows under the form. */
+.recent-menus { margin: 1.75rem 0 1rem; }
+.recent-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.recent-list { list-style: none; margin: .5rem 0; padding: 0; display: grid; gap: .6rem; }
+.recent { display: flex; align-items: stretch; gap: .5rem; }
+.recent-open { flex: 1; min-width: 0; text-align: left; display: grid; gap: .15rem; padding: .7rem 1rem; border: var(--outline) solid var(--ink); border-radius: 16px; background: var(--paper); }
+.recent-open { font-family: var(--sans); font-weight: 400; letter-spacing: 0; }
+.recent-name { font-family: var(--heading); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-meta, .recent-picks { font-size: .82rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-x { flex: 0 0 auto; min-width: var(--tap); }
+
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
   body { font-size: 1.0625rem; padding-bottom: 0; }
