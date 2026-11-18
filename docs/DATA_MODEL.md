@@ -160,3 +160,21 @@ eaten", "something starchy", "actually, no fish today") into:
 - The menu is reused; refining never re-extracts it.
 - Both recommenders use it. Locally, a craving outweighs stored taste for today, and "not today" sets a dish aside even when the profile says the diner usually likes it (the headline says the profile is unchanged). The AI gets `<session>` and the previous picks and may write a `changeNote`; afterwards `enforceSession()` sets aside any pick that matches "not today", and the guard drops `session` evidence when nothing was said.
 - `explainChange()` builds the "In / Out / moved to the top" lines deterministically from the two shortlists. Statements the matcher couldn't read are shown to the diner rather than guessed at.
+
+## Combinations and meal goals
+
+Recommendations carry `combos: [{ title, dishIds, why }]`, ways to put an order together (`shared/combos.js` locally, or the AI):
+
+- **Your plate + a bite of theirs:** the diner can share a partner's food, so a vegetable dish plus a shareable dish labelled meat or seafood.
+- **A few plates for the table:** sharing, so three or four shareable small plates.
+- **Main + a small side:** the default, except when the diner isn't very hungry or the table is sharing.
+- **Just something sweet / One small plate:** already eaten.
+- **Save room for dessert:** a sweet craving.
+
+Dish roles come from the menu's own section names first ("Beilagen", "Mezedes", "Desserts") and from attributes only when there is no section. Drinks are never part of a combination.
+
+The guard drops any combination that contains a dish it removed or an unknown dish, and `enforceSession()` drops any that contains a "not today" dish.
+
+General taste (profile), the current craving, hunger, sharing and familiar-vs-adventurous are separate inputs. Nothing optimises calories or protein unless the diner asks; "more protein" is a craving like any other.
+
+The browser's whole pick path (AI → fallback → guard → session) is `shared/pipeline.js` (`choosePicks`), so the behavioural scenarios in `test/scenarios.test.js` exercise exactly what the diner sees.

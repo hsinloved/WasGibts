@@ -141,12 +141,25 @@ export function guardRecommendation(recs, menu, { restrictions = [], allowedRefs
     });
   }
 
+  // Combinations: only real, allowed dishes; a combo that loses a dish is dropped.
+  const allowed = new Set(picks.map((p) => p.dishId));
+  const blocked = new Set(report.removed.map((r) => r.dishId));
+  const combos = [];
+  for (const c of recs.combos ?? []) {
+    const ids = (c.dishIds ?? []).filter((id) => byId.has(id));
+    const bad = ids.some((id) => blocked.has(id) || (flagged.get(id) ?? []).some((h) => h.restriction.severity === 'strict'));
+    if (bad || !ids.length || ids.length !== (c.dishIds ?? []).length) { report.droppedCombos = (report.droppedCombos ?? 0) + 1; continue; }
+    const [why, n] = scrub(c.why, ids.length === 1 ? byId.get(ids[0]) : null);
+    report.strippedClaims += n;
+    combos.push({ title: String(c.title ?? '').slice(0, 60), dishIds: ids, why: why || '' , picked: ids.every((id) => allowed.has(id)) });
+  }
+
   const [orderingTip, n3] = scrub(recs.orderingTip, null);
   const [changeNote, n5] = scrub(recs.changeNote, null);
   report.strippedClaims += n5;
   const [headline, n4] = scrub(recs.headline, null);
   report.strippedClaims += n3 + n4;
-  return { ...recs, headline: headline ?? '', picks, cautions, orderingTip: orderingTip || null, changeNote: changeNote || null, guard: report };
+  return { ...recs, headline: headline ?? '', picks, combos, cautions, orderingTip: orderingTip || null, changeNote: changeNote || null, guard: report };
 }
 
 /** The ids evidence may cite, from what was actually submitted. */
