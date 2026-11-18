@@ -793,6 +793,10 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
 .dish-photo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: var(--outline) solid var(--ink); border-radius: 14px; background: var(--paper-2); }
 .dish-photo figcaption { font-family: var(--mono); font-size: .7rem; letter-spacing: .04em; color: var(--muted); margin-top: .25rem; }
 
+.recipe-list { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: .9rem; }
+.recipe { border: 2px solid var(--ink); border-radius: 16px; padding: .8rem 1rem; background: var(--paper); }
+.recipe .keeps { margin: .35rem 0; }
+
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
   body { font-size: 1.0625rem; padding-bottom: 0; }

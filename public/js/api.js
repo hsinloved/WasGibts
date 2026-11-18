@@ -33,6 +33,7 @@ export const api = {
   extract: (source, settings) => post('/api/menu/extract', { source, ...settings }),
   recommend: (payload) => post('/api/recommend', payload),
   parseProfile: (text) => post('/api/profile/parse', { text }),
+  recipeIdeas: (payload) => post('/api/recipes/ideas', payload),
 };
 
 const MAX_PDF = 20 * 1024 * 1024;

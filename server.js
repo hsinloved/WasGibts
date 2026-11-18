@@ -8,7 +8,8 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { extractMenu, recommend, parseProfile, aiInfo, aiAvailable, AIError } from './lib/ai.js';
+import { extractMenu, recommend, parseProfile, recipeIdeas, aiInfo, aiAvailable, AIError } from './lib/ai.js';
+import { CUISINES } from './shared/recipes.js';
 import { partsFromFiles, SourceError } from './lib/sources.js';
 import { resolveLinkSource } from './lib/resolve.js';
 import { normalizeMenu } from './shared/menu.js';
@@ -172,6 +173,24 @@ const routes = {
       session: normalizeSession(body.session),
       previous: (Array.isArray(body.previous) ? body.previous : []).slice(0, 5).map((x) => clip(x, 40)),
       screen: Array.isArray(body.screen) ? body.screen.slice(0, 50) : [],
+    });
+  },
+
+  'POST /api/recipes/ideas': async (req) => {
+    requireAI();
+    requirePasscode(req);
+    rateLimit(req);
+    const body = await readJson(req, LIMITS.default);
+    const cuisine = CUISINES.includes(body.cuisine) ? body.cuisine : clip(body.cuisine, 40).trim();
+    if (!cuisine) throw new HttpError(400, 'Pick a cuisine.');
+    const list = (v, n) => (Array.isArray(v) ? v : []).slice(0, n);
+    return recipeIdeas({
+      cuisine,
+      request: clip(body.request, 300),
+      count: Math.max(1, Math.min(6, Number(body.count) || 4)),
+      restrictions: list(body.restrictions, 30).map((r) => ({ type: clip(r?.type, 20), subject: clip(r?.subject, 60), severity: r?.severity === 'strict' ? 'strict' : 'flexible' })).filter((r) => r.subject),
+      dislikes: list(body.dislikes, 40).map((d) => clip(d, 60)).filter(Boolean),
+      language: clip(body.language, 60) || 'English',
     });
   },
 
