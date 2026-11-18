@@ -6,6 +6,7 @@ The menu board as a shout: fat rounded letters, one ink outline weight, flat col
 
 - **Palette:** rice-paper cream `#fff4dc`, ink `#171412`, paprika `#e94a2b` (fills; text uses `--accent` `#b8331a`, 5.4:1 on cream), egg yolk `#ffc72c`, deep green `#185c54`. Dark mode swaps the surfaces to ink and keeps yolk and paprika.
 - **Type:** *Bagel Fat One* for the wordmark and page titles, *Titan One* for headings, dish names, buttons and chips, *Inter* for reading, *DM Mono* for small labels.
+- **Chinese and Japanese in headings and dish names:** *Mantou Sans* (饅頭黑體, OFL, based on Dela Gothic One), self-hosted in `public/fonts/` and served **unmodified**, because its licence reserves the name for unmodified copies (so no subsetting). Its `unicode-range` means the 2.7 MB file only downloads on screens that show those characters, and it is cached for a year. It covers Traditional Chinese fully. Simplified characters it lacks (鱼 鸡 锅 …) fall back to *Noto Sans SC Black* from Google Fonts, which is served in small slices. Reading text stays in the system font.
 - **Shapes:** one outline weight (`--outline`, 3px). Buttons and chips are pills. Pick cards and the order tray are cream cards with an ink outline and a 4px ink drop. Pick numbers are yolk stickers tilted −8°. Menu sections sit between two heavy rules.
 - **Brand moments:** the green header with the diagonal wrapper of dish names (`public/band.png`), the yolk tab pill, the yolk order bar, the yolk staff view. The emblem is a bowl with chopsticks (favicon and app icons).
 

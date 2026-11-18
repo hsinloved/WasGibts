@@ -10,6 +10,19 @@
    targets, navigation in the thumb zone, safe-area insets). Wider screens are
    layered on in the min-width blocks at the very end, which must stay last. */
 
+/* Chinese, Japanese and full-width characters in headings and dish names:
+   Mantou Sans (饅頭黑體, OFL; based on Dela Gothic One), served unmodified as
+   its licence's Reserved Font Name requires. unicode-range means the 2.7 MB
+   file is only downloaded on screens that show those characters. It covers
+   Traditional Chinese fully; Simplified characters it lacks (鱼 鸡 锅 …) fall
+   back to Noto Sans SC Black, which Google serves in small slices. Licence: /fonts/MantouSans-OFL.txt */
+@font-face {
+  font-family: 'Mantou Sans';
+  src: url('/fonts/MantouSans-Regular.ttf') format('truetype');
+  font-display: swap;
+  unicode-range: U+3000-303F, U+3040-30FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}
+
 :root {
   --paper: #fff4dc;         /* rice-paper cream */
   --paper-2: #fbe7bf;
@@ -29,8 +42,8 @@
   --outline: 3px;           /* the one outline weight */
   --serif: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --display: 'Bagel Fat One', 'Titan One', system-ui, sans-serif;
-  --heading: 'Titan One', 'Bagel Fat One', system-ui, sans-serif;
+  --display: 'Bagel Fat One', 'Mantou Sans', 'Noto Sans SC', 'Titan One', system-ui, sans-serif;
+  --heading: 'Titan One', 'Mantou Sans', 'Noto Sans SC', 'Bagel Fat One', system-ui, sans-serif;
   --mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
   --grain-opacity: 0;       /* flat colour: no grain */
   --measure: 42rem;
