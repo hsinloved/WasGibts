@@ -49,6 +49,9 @@ export const FEEDBACK = /** @type {const} */ ({
   loved:          { label: 'I loved this',             tone: 'positive', effects: [{ target: 'dish-attributes', polarity: 'like', weight: 1 }] },
   order_again:    { label: "I'd order it again",       tone: 'positive', effects: [{ target: 'dish', polarity: 'like', weight: 1.5 }] },
   liked:          { label: 'It was good',              tone: 'positive', effects: [{ target: 'dish-attributes', polarity: 'like', weight: 0.5 }] },
+  // Satisfaction with the choice, not a verdict on its ingredients: a like for
+  // this dish on this occasion only, with nothing spread to what is in it.
+  right_for_moment: { label: 'Right for the moment',   tone: 'positive', effects: [{ target: 'dish-occasion', polarity: 'like', weight: 1 }] },
   too_rich:       { label: 'Too rich',                 tone: 'negative', effects: [{ target: 'style', subject: 'rich, heavy dishes', polarity: 'dislike', weight: 1 }] },
   too_spicy:      { label: 'Too spicy',                tone: 'negative', effects: [{ target: 'flavour', subject: 'strong chilli heat', polarity: 'dislike', weight: 1 }] },
   too_mild:       { label: 'Wanted more heat',         tone: 'negative', effects: [{ target: 'flavour', subject: 'chilli heat', polarity: 'like', weight: 1 }] },
@@ -132,6 +135,19 @@ export function makeRestriction(fields, { by = 'user', source = 'user_stated', n
 }
 
 /** @returns {HistoryEntry} */
+/**
+ * What the diner said about the meal when they ordered (from "Refine my
+ * picks"), kept as plain words so the journal can show it. `matched` lists the
+ * cravings this dish answered; feedback on it then says less about lasting taste.
+ */
+export function makeOrderContext(c) {
+  if (!c || typeof c !== 'object') return null;
+  const words = (v) => (Array.isArray(v) ? v : []).map((x) => String(x).slice(0, 40)).filter(Boolean).slice(0, 8);
+  const word = (v) => (v ? String(v).slice(0, 40) : null);
+  const out = { hunger: word(c.hunger), sharing: word(c.sharing), novelty: word(c.novelty), cravings: words(c.cravings), avoid: words(c.avoid), matched: words(c.matched) };
+  return out.hunger || out.sharing || out.novelty || out.cravings.length || out.avoid.length ? out : null;
+}
+
 export function makeHistoryEntry(fields) {
   const d = fields.dish ?? {};
   return {
@@ -149,6 +165,7 @@ export function makeHistoryEntry(fields) {
       price: d.price ?? null,
     },
     recommended: Boolean(fields.recommended),
+    context: makeOrderContext(fields.context),
     feedback: Array.isArray(fields.feedback) ? fields.feedback.filter((f) => f in FEEDBACK) : [],
     note: String(fields.note ?? ''),
     feedbackAt: fields.feedbackAt ?? null,

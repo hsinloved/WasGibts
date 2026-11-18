@@ -12,6 +12,7 @@ import { extractMenu, recommend, parseProfile, aiInfo, aiAvailable, AIError } fr
 import { partsFromFiles, SourceError } from './lib/sources.js';
 import { resolveLinkSource } from './lib/resolve.js';
 import { normalizeMenu } from './shared/menu.js';
+import { normalizeSession } from './shared/session.js';
 
 const PORT = Number(process.env.PORT) || 8890;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -166,6 +167,8 @@ const routes = {
       language: clip(body.language, 60) || 'English',
       includeAdventurous: Boolean(body.includeAdventurous),
       request: clip(body.request, 500),
+      session: normalizeSession(body.session),
+      previous: (Array.isArray(body.previous) ? body.previous : []).slice(0, 5).map((x) => clip(x, 40)),
       screen: Array.isArray(body.screen) ? body.screen.slice(0, 50) : [],
     });
   },

@@ -2,9 +2,10 @@ import { h, mount, toast, plural } from '../dom.js';
 import { api, readFiles, passcode } from '../api.js';
 import { session } from '../store.js';
 import { OCCASIONS } from '/shared/model.js';
-import { normalizeMenu, priceLabel, dishSnapshot, STYLE_ATTRIBUTES } from '/shared/menu.js';
-import { profileForAI } from '/shared/profile.js';
-import { recommendLocally, screenRestrictions } from '/shared/recommend.js';
+import { normalizeMenu, priceLabel, dishSnapshot, dishText, STYLE_ATTRIBUTES } from '/shared/menu.js';
+import { screenRestrictions } from '/shared/recommend.js';
+import { choosePicks } from '/shared/pipeline.js';
+import { emptySession, applyStatement, removeFromSession, describeSession, explainChange, sessionForAI, normalizeSession, groupMatch, labelOf } from '/shared/session.js';
 
 const state = {
   tab: 'photos',
@@ -19,9 +20,14 @@ const state = {
   error: null,
   editing: false,   // show the input form above existing results
   autoStart: false,
+  // "Refine my picks": what the diner said about this meal (shared/session.js).
+  // Lives with the menu in sessionStorage and never touches the profile.
+  refine: emptySession(),
+  change: null,     // { lines, entry, note } after the latest refinement
+  refineText: '',
   ...session.get(), // menu, recs survive reloads
 };
-const persist = () => session.set({ menu: state.menu, recs: state.recs, occasion: state.occasion, request: state.request, link: state.link });
+const persist = () => session.set({ menu: state.menu, recs: state.recs, occasion: state.occasion, request: state.request, link: state.link, refine: state.refine, change: state.change });
 
 const PLATFORM_RX = /(lieferando|thuisbezorgd|just-eat|takeaway\.com|wolt\.com|ubereats|deliveroo|foodora|foodpanda)/i;
 const PLATFORM_NAMES = { lieferando: 'Lieferando', thuisbezorgd: 'Thuisbezorgd', 'just-eat': 'Just Eat', 'takeaway.com': 'Takeaway', 'wolt.com': 'Wolt', ubereats: 'Uber Eats', deliveroo: 'Deliveroo', foodora: 'foodora', foodpanda: 'foodpanda' };
@@ -257,6 +263,9 @@ async function readMenu(ctx, rerender) {
     }
     state.recs = null;
     state.editing = false;
+    // A new menu starts a new session; the "anything today?" text seeds it.
+    state.refine = state.request.trim() ? applyStatement(emptySession(), state.request).session : emptySession();
+    state.change = null;
     await refreshPicks(ctx, rerender);
   } catch (err) {
     if (err.status === 401) { passcode.set(''); Object.assign(ctx.ai, { available: false, locked: true }); }
@@ -288,33 +297,90 @@ function progress() {
     h('p.hint', {}, 'Usually under a minute. You can keep this screen open.'));
 }
 
-async function refreshPicks(ctx, rerender) {
+async function refreshPicks(ctx, rerender, { explain = false } = {}) {
   const { store, ai } = ctx;
+  const previous = state.recs;
   const profile = store.profile;
   state.error = null;
   const screen = profile.settings.shareRestrictionsWithAI
     ? [...screenRestrictions(state.menu, profile)].flatMap(([dishId, hits]) => hits.map((x) => ({ dishId, restriction: x.restriction.subject, type: x.restriction.type, verifiedOnMenu: x.verified })))
     : [];
-  try {
-    if (ai.available) {
-      if (state.steps) nextStep(); else beginSteps([MATCHING]);
-      rerender();
-      state.recs = await api.recommend({
-        menu: state.menu, occasion: state.occasion, request: state.request, screen,
-        language: profile.settings.translateTo, includeAdventurous: profile.settings.includeAdventurousPick,
-        profile: profileForAI(profile, { occasion: state.occasion }),
-      });
-    } else {
-      state.recs = recommendLocally(state.menu, profile, { occasion: state.occasion });
-    }
-  } catch (err) {
-    state.recs = recommendLocally(state.menu, profile, { occasion: state.occasion });
-    state.recs.fallbackReason = err.message;
+  if (ai.available) { if (state.steps) nextStep(); else beginSteps([MATCHING]); rerender(); }
+  state.recs = await choosePicks({
+    menu: state.menu, profile, occasion: state.occasion, session: state.refine,
+    ai: ai.available ? (view) => api.recommend({
+      menu: state.menu, occasion: state.occasion, screen,
+      session: state.refine, previous: explain ? (previous?.picks ?? []).map((p) => p.dishId) : [],
+      language: profile.settings.translateTo, includeAdventurous: profile.settings.includeAdventurousPick,
+      profile: view,
+    }) : null,
+  });
+  if (explain && state.change) {
+    state.change.lines = explainChange(previous, state.recs, state.menu);
+    state.change.note = state.recs.changeNote ?? null;
   }
   endSteps();
   persist();
   rerender();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (!explain) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// --- Refine my picks -----------------------------------------------------------
+
+const REFINE_EXAMPLES = [
+  'I’ve already eaten',
+  'I want something starchy',
+  'I’d like more protein',
+  'I can share some of my partner’s food',
+  'Actually, I don’t feel like fish today',
+];
+
+function refine(ctx, rerender, text) {
+  const t = String(text).trim();
+  if (!t || state.busy) return;
+  const { session: next, entry } = applyStatement(state.refine, t);
+  state.refine = next;
+  state.refineText = '';
+  state.change = { entry, lines: [], note: null };
+  refreshPicks(ctx, rerender, { explain: true });
+}
+
+function refineBar(ctx, rerender) {
+  const active = describeSession(state.refine);
+  const entry = state.change?.entry;
+  const unparsed = entry?.unparsed ?? [];
+  const local = state.recs?.engine !== 'ai';
+  return h('section.refine', { 'aria-label': 'Refine my picks' },
+    h('form.refine-form', { onsubmit: (e) => { e.preventDefault(); refine(ctx, rerender, state.refineText); } },
+      h('label.refine-label', { for: 'refine-input' }, 'Refine my picks'),
+      h('div.refine-row', {},
+        h('input', { id: 'refine-input', type: 'text', maxlength: 300, enterkeyhint: 'send', autocomplete: 'off', placeholder: 'e.g. not that hungry, no fish today', value: state.refineText, oninput: (e) => { state.refineText = e.target.value; } }),
+        h('button.primary.small', { type: 'submit', disabled: Boolean(state.busy) }, 'Refine')),
+      h('div.chips.scroll-row.refine-examples', {}, REFINE_EXAMPLES.map((x) => h('button.chip', { type: 'button', disabled: Boolean(state.busy), onclick: () => refine(ctx, rerender, x) }, x))),
+    ),
+    active.length > 0 && h('div.refine-active', {},
+      h('p.eyebrow', {}, 'Just for this meal'),
+      h('div.chips', {}, active.map((c) => h('button.chip.on', {
+        type: 'button', 'aria-label': `Remove “${c.label}”`, disabled: Boolean(state.busy),
+        onclick: () => { state.refine = removeFromSession(state.refine, c.dim, c.value); state.change = { entry: { text: `Removed: ${c.label}`, kind: 'correction', unparsed: [], suggestions: [] }, lines: [], note: null }; refreshPicks(ctx, rerender, { explain: true }); },
+      }, c.label, h('span.x', { 'aria-hidden': 'true' }, ' ×')))),
+      h('button.ghost.small', { type: 'button', disabled: Boolean(state.busy), onclick: () => { state.refine = emptySession(); state.change = null; refreshPicks(ctx, rerender); } }, 'Start over'),
+    ),
+    state.change && h('div.refine-change', { role: 'status' },
+      state.change.lines.length > 0 && h('ul.change-lines', {}, state.change.lines.map((l) => h(`li.change-${l.kind}`, {}, l.text))),
+      state.change.note && h('p.small', {}, state.change.note),
+      unparsed.length > 0 && h('p.small.muted', {},
+        local
+          ? `I couldn’t act on “${unparsed.join('”, “')}”. The built-in matcher understands hunger, sharing, “something new/familiar” and simple foods (starchy, protein, veg, fish, meat, sweet, spicy…).`
+          : `Passed on as written: “${unparsed.join('”, “')}”.`),
+      (entry?.suggestions ?? []).map((sg) => h('p.callout.small.save-suggest', {},
+        `That sounds like it’s true beyond today: ${sg.polarity === 'like' ? 'you like' : 'you’d rather avoid'} ${sg.subject}. `,
+        h('button.small', { type: 'button', onclick: async (e) => {
+          await ctx.store.do('addPreference', { polarity: sg.polarity, category: 'other', subject: sg.subject, note: `Saved from “${entry.text}”`, contexts: [] });
+          e.target.closest('.save-suggest').replaceChildren(`Saved to your profile: ${sg.polarity === 'like' ? 'likes' : 'avoids'} ${sg.subject}.`);
+        } }, 'Save to my profile'))),
+    ),
+  );
 }
 
 // --- Results -------------------------------------------------------------------
@@ -345,11 +411,14 @@ function results(ctx, rerender) {
         h('p.headline', {}, recs.headline),
         h('p.engine', {}, recs.engine === 'ai' ? 'Picked by the AI from your taste profile.' : 'Picked by the built-in matcher (exact matches with your profile only).'),
         recs.fallbackReason && h('p.error.small', {}, `The AI couldn’t help this time (${recs.fallbackReason}), so these come from the built-in matcher.`),
+        guardNote(recs, byId),
       ),
+      refineBar(ctx, rerender),
       h('ol.pick-list', {}, recs.picks.map((p, i) => {
         const d = byId.get(p.dishId);
         return d && pickCard(ctx, d, p, i);
       })),
+      combos(recs, byId),
       recs.orderingTip && h('p.tip', {}, h('strong', {}, 'Tip. '), recs.orderingTip),
       recs.cautions.length > 0 && h('aside.cautions', {},
         h('h3', {}, 'Check before ordering'),
@@ -378,6 +447,28 @@ function results(ctx, rerender) {
       )),
     ),
   );
+}
+
+/** Ways to put the order together (shared/combos.js or the AI). */
+function combos(recs, byId) {
+  const list = (recs.combos ?? []).filter((c) => c.dishIds.every((id) => byId.has(id)));
+  if (!list.length) return null;
+  return h('section.combos', { 'aria-label': 'Ways to put it together' },
+    h('h3.combos-title', {}, 'Put it together'),
+    h('ul.combo-list', {}, list.map((c) => h('li.combo', {},
+      h('p.combo-name', {}, c.title),
+      h('p.combo-dishes', {}, c.dishIds.map((id, i) => [i ? h('span.plus', { 'aria-hidden': 'true' }, ' + ') : null, h('span', {}, byId.get(id).translatedName || byId.get(id).originalName)])),
+      c.why && h('p.small.muted', {}, c.why))),
+    ));
+}
+
+/** Tell the diner when the safety guard took a pick out (see shared/guard.js). */
+function guardNote(recs, byId) {
+  const removed = (recs.guard?.removed ?? []).filter((r) => r.kind === 'restriction');
+  if (!removed.length) return null;
+  return h('p.callout.small.guard-note', {},
+    `Left out ${removed.length === 1 ? 'one dish' : `${removed.length} dishes`} because of your restrictions: `,
+    removed.map((r) => `${byId.get(r.dishId)?.originalName ?? r.dishId} (${r.reason})`).join('; '), '.');
 }
 
 function pickCard(ctx, d, p, i) {
@@ -445,7 +536,7 @@ function dishActions(ctx, d, recommended) {
   const inJournal = (action) => store.profile.history.some((x) => x.action === action && x.dish.originalName === d.originalName && x.restaurant.name === (state.menu.restaurant.name ?? null) && !x.feedbackAt && Date.now() - Date.parse(x.at) < 864e5);
   const add = async (action, e) => {
     await store.do('recordHistory', {
-      action, occasion: state.occasion, recommended,
+      action, occasion: state.occasion, recommended, context: orderContext(d),
       restaurant: { name: state.menu.restaurant.name, url: state.menu.source.url },
       dish: dishSnapshot(d),
     });
@@ -458,6 +549,14 @@ function dishActions(ctx, d, recommended) {
     h('button.small', { type: 'button', disabled: inJournal('ordered'), dataset: { order: d.originalName }, onclick: (e) => add('ordered', e) }, inJournal('ordered') ? 'Ordered ✓' : '+ Order this'),
     h('button.small.ghost', { type: 'button', disabled: inJournal('saved'), onclick: (e) => add('saved', e) }, inJournal('saved') ? 'Saved ✓' : 'Save'),
   );
+}
+
+/** What was said about this meal, in words, plus the cravings this dish answered. */
+function orderContext(d) {
+  const ctx = sessionForAI(state.refine);
+  const s = normalizeSession(state.refine);
+  return { hunger: ctx.hunger, sharing: ctx.sharing, novelty: ctx.novelty, cravings: ctx.cravings, avoid: ctx.avoidToday,
+    matched: s.cravings.filter((k) => groupMatch(k, d, dishText(d))).map(labelOf) };
 }
 
 function groupBy(list, fn) {

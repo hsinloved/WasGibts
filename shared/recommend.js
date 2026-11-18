@@ -7,8 +7,10 @@
 // suggested pattern, a past order, or a word on the menu.
 
 import { FEEDBACK, OCCASIONS, subjectKey, confidenceLabel } from './model.js';
-import { isEmerging, isUnverifiedPrior } from './profile.js';
+import { isEmerging, isUnverifiedPrior, appliesTo } from './profile.js';
 import { dishText } from './menu.js';
+import { suggestCombos } from './combos.js';
+import { normalizeSession, groupMatch, labelOf, contextLabel, FOOD_GROUPS } from './session.js';
 
 const OCCASION_RULES = {
   solo: { plus: [], minus: [] },
@@ -95,12 +97,30 @@ export function screenRestrictions(menu, profile) {
   return out;
 }
 
+/** How the session context nudges dishes: attributes to favour and to play down; `why` = cite it. */
+const SESSION_RULES = {
+  hunger: {
+    ate: { plus: ['light', 'shareable', 'sweet', 'quick'], minus: ['filling', 'rich', 'braised'], why: true },
+    light: { plus: ['light', 'quick'], minus: ['filling', 'rich'], why: true },
+    hungry: { plus: ['filling', 'braised', 'rich'], minus: ['light'], why: true },
+  },
+  sharing: {
+    partner: { plus: ['shareable'], minus: [], why: true },
+    group: { plus: ['shareable'], minus: ['soup', 'messy'], why: true },
+    solo: { plus: [], minus: [], why: false },
+  },
+  novelty: {
+    adventurous: { plus: ['unusual', 'fermented'], minus: [], why: true },
+    familiar: { plus: [], minus: ['unusual', 'fermented'], why: false },
+  },
+};
+
 export function recommendLocally(menu, profile, context = {}) {
   const occasion = context.occasion in OCCASIONS ? context.occasion : null;
   const rules = OCCASION_RULES[occasion] ?? { plus: [], minus: [] };
-  const prefs = profile.preferences.filter(
-    (p) => p.status !== 'dismissed' && !isEmerging(p) && (!p.contexts.length || (occasion && p.contexts.includes(occasion))),
-  );
+  const session = normalizeSession(context.session);
+  const setAside = [];
+  const prefs = profile.preferences.filter((p) => p.status !== 'dismissed' && !isEmerging(p) && appliesTo(p, occasion));
   const flagged = screenRestrictions(menu, profile);
   const orderedAgain = new Map(
     profile.history.filter((h) => h.feedback.length).map((h) => [subjectKey(h.dish.originalName), h]),
@@ -151,6 +171,27 @@ export function recommendLocally(menu, profile, context = {}) {
     for (const a of rules.plus) if (d.attributes.includes(a)) { score += 0.5; evidence.push({ type: 'menu', ref: null, text: `Suits ${OCCASIONS[occasion].label.toLowerCase()}: ${a.replace('-', ' ')}.` }); }
     for (const a of rules.minus) if (d.attributes.includes(a)) { score -= 1; concerns.push(`Less ideal for ${OCCASIONS[occasion].label.toLowerCase()}: ${a.replace('-', ' ')}.`); }
 
+    // Session context: what the diner said about right now. Cravings count for
+    // more than stored taste because they are about this meal; a "not today"
+    // sets the dish aside even when the profile says they usually like it.
+    for (const key of session.avoid) {
+      const hit = groupMatch(key, d, text);
+      if (hit) setAside.push({ dishId: d.id, reason: `no ${FOOD_GROUPS[key]?.noun ?? key} today${hit !== key ? ` (${hit})` : ''}`, key });
+    }
+    for (const key of session.cravings) {
+      const hit = groupMatch(key, d, text);
+      if (hit) { score += 2.5; evidence.unshift({ type: 'session', ref: key, text: `You asked for ${labelOf(key)} today${hit !== key && hit !== labelOf(key) ? ` (${hit})` : ''}.` }); }
+    }
+    for (const dim of ['hunger', 'sharing', 'novelty']) {
+      const r = session[dim] && SESSION_RULES[dim][session[dim]];
+      if (!r) continue;
+      // Skip what the occasion already credited, so a reason is not given twice.
+      const plus = r.plus.find((a) => d.attributes.includes(a) && !rules.plus.includes(a));
+      if (plus) { score += 0.7; if (r.why) evidence.push({ type: 'session', ref: dim, text: `Fits “${contextLabel(dim, session[dim])}” today: ${plus.replace('-', ' ')}.` }); }
+      const minus = r.minus.find((a) => d.attributes.includes(a));
+      if (minus) { score -= 0.9; concerns.push(`${minus.replace('-', ' ')[0].toUpperCase()}${minus.replace('-', ' ').slice(1)}, which matters given ${dim === 'hunger' ? 'how hungry you are' : 'what you said'} today.`); }
+    }
+
     const hits = flagged.get(d.id) ?? [];
     const blocked = hits.some((h) => h.restriction.severity === 'strict');
     for (const h of hits) {
@@ -160,7 +201,8 @@ export function recommendLocally(menu, profile, context = {}) {
     return { d, score, evidence, concerns, blocked, hits };
   });
 
-  const eligible = scored.filter((s) => !s.blocked).sort((a, b) => b.score - a.score);
+  const asideIds = new Set(setAside.map((x) => x.dishId));
+  const eligible = scored.filter((s) => !s.blocked && !asideIds.has(s.d.id)).sort((a, b) => b.score - a.score);
   const withSignal = eligible.filter((s) => s.evidence.length && s.score > 0);
   const pool = (withSignal.length >= 3 ? withSignal : eligible).slice(0, 5);
   const picks = pool.slice(0, Math.max(3, Math.min(5, withSignal.length))).map((s, i) => ({
@@ -199,6 +241,13 @@ export function recommendLocally(menu, profile, context = {}) {
     restrictionId: s.hits[0].restriction.id,
   }));
 
+  // A "not today" that overrides something the profile says they like: say so.
+  const overridden = session.avoid.filter((key) => prefs.some((p) => p.polarity === 'like'
+    && (subjectKey(p.subject).includes(key) || groupMatch(key, { attributes: [] }, subjectKey(p.subject)))));
+  const todayNote = [
+    overridden.length && `Leaving out ${overridden.map(labelOf).join(' and ')} today, though you usually like ${overridden.length > 1 ? 'them' : 'it'}; your profile is unchanged.`,
+  ].filter(Boolean).join(' ');
+
   const broadLikes = prefs.filter((p) => broad.has(p.id) && p.polarity === 'like').map((p) => p.subject);
   const broadDislikes = prefs.filter((p) => broad.has(p.id) && p.polarity === 'dislike').map((p) => p.subject);
   const overall = [
@@ -207,12 +256,20 @@ export function recommendLocally(menu, profile, context = {}) {
   ].filter(Boolean).join(' ');
   return {
     engine: 'local',
-    headline: [overall, withSignal.length
+    headline: [todayNote, overall, withSignal.length
       ? `${withSignal.length === 1 ? 'One dish stands' : `${withSignal.length} dishes stand`} out for you specifically.`
       : 'Nothing stands out against your profile yet, so treat these as starting points.'].filter(Boolean).join(' '),
     picks,
     cautions,
     orderingTip: null,
+    setAside: dedupeAside(setAside),
+    combos: suggestCombos(eligible, { session, occasion }),
     occasionQuestion: occasion ? null : 'Eating solo, sharing, or ordering in? It changes which dishes travel and share well.',
   };
+}
+
+function dedupeAside(list) {
+  const seen = new Map();
+  for (const x of list) if (!seen.has(x.dishId)) seen.set(x.dishId, { dishId: x.dishId, reason: x.reason });
+  return [...seen.values()];
 }

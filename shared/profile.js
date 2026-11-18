@@ -185,14 +185,22 @@ export function recordHistory(profile, fields) {
  * Turn a feedback tag on a dish into the signals it implies. Exported for
  * tests and for the UI ("this will teach WasGibts that...").
  */
-export function signalsFor(tag, dish) {
+export function signalsFor(tag, dish, entry = null) {
   const def = FEEDBACK[tag];
   if (!def) return [];
   const out = [];
   const dishName = dish.translatedName || dish.originalName;
+  // Ordered because of a craving ("something starchy")? Then enjoying it is
+  // partly the craving talking: it counts half towards lasting taste.
+  const craving = entry?.context?.matched ?? [];
+  const factor = craving.length ? 0.5 : 1;
   for (const e of def.effects) {
     if (e.target === 'dish') {
       out.push({ category: 'dish', subject: dishName, polarity: e.polarity, weight: e.weight });
+    } else if (e.target === 'dish-occasion') {
+      // Only the dish, only the occasion; unknown occasion → weaker, unscoped.
+      const occasion = entry?.occasion ?? null;
+      out.push({ category: 'dish', subject: dishName, polarity: e.polarity, weight: occasion ? e.weight : e.weight * 0.5, contexts: occasion ? [occasion] : [], scope: 'moment' });
     } else if (e.target === 'dish-attributes') {
       // Spread the weight: one dish is weak evidence about any single ingredient.
       const parts = [
@@ -200,7 +208,7 @@ export function signalsFor(tag, dish) {
         ...(dish.cuisine ? [{ category: 'cuisine', subject: dish.cuisine }] : []),
         ...dish.attributes.slice(0, 3).map((s) => ({ category: 'style', subject: s })),
       ];
-      for (const p of parts) out.push({ ...p, polarity: e.polarity, weight: e.weight * 0.5 });
+      for (const p of parts) out.push({ ...p, polarity: e.polarity, weight: e.weight * 0.5 * factor, ...(craving.length ? { craving } : {}) });
     } else {
       out.push({ category: e.target, subject: e.subject, polarity: e.polarity, weight: e.weight });
     }
@@ -225,15 +233,16 @@ export function applyFeedback(profile, historyId, tags, note = '') {
   const label = entry.dish.translatedName || entry.dish.originalName;
   const touched = [];
   for (const tag of entry.feedback) {
-    for (const sig of signalsFor(tag, entry.dish)) {
+    for (const sig of signalsFor(tag, entry.dish, entry)) {
+      const why = sig.craving ? ` (ordered while craving ${sig.craving.join(' and ')}; counts half)` : sig.scope === 'moment' ? (sig.contexts.length ? ` (for ${OCCASIONS[sig.contexts[0]]?.label.toLowerCase() ?? sig.contexts[0]} only)` : ' (occasion unknown; counts half)') : '';
       const evidence = {
         source: 'feedback', ref: historyId, weight: sig.weight, at: now(),
-        note: `${FEEDBACK[tag].label} — ${label}${entry.restaurant.name ? ` at ${entry.restaurant.name}` : ''}`,
+        note: `${FEEDBACK[tag].label} — ${label}${entry.restaurant.name ? ` at ${entry.restaurant.name}` : ''}${why}`,
       };
       let pref = findPreference(profile, sig);
       if (!pref) {
         pref = makePreference(
-          { origin: 'inferred', status: 'suggested', category: sig.category, subject: sig.subject, polarity: sig.polarity, confidence: 0, evidence: [] },
+          { origin: 'inferred', status: 'suggested', category: sig.category, subject: sig.subject, polarity: sig.polarity, confidence: 0, evidence: [], contexts: sig.contexts ?? [] },
           { by: 'system' },
         );
         pref.history = [{ at: now(), by: 'system', action: 'noticed', detail: `From your feedback on ${label}` }];
@@ -307,15 +316,21 @@ export const isEmerging = (pref) => pref.origin === 'inferred' && pref.status !=
 
 // --- Views --------------------------------------------------------------------
 
+/** Does a preference apply on this occasion? Untied ones always do; tied ones only on their occasions. */
+export const appliesTo = (pref, occasion) => !pref.contexts.length || Boolean(occasion && pref.contexts.includes(occasion));
+
 /**
  * The compact view of a profile that is sent to the AI layer. The profile
  * itself never leaves the device except through this function.
  */
 export function profileForAI(profile, { occasion } = {}) {
-  const prefs = profile.preferences
-    .filter((p) => p.status !== 'dismissed')
-    .filter((p) => !isEmerging(p))
-    .filter((p) => !p.contexts.length || !occasion || p.contexts.includes(occasion))
+  const usable = profile.preferences.filter((p) => p.status !== 'dismissed' && !isEmerging(p));
+  // Same rule as the local matcher (shared/recommend.js): a preference tied to
+  // occasions only counts when the occasion is known and is one of them. With
+  // no occasion it may only help decide whether to ask; it is listed apart,
+  // by subject only, so it can never be cited as a reason for a pick.
+  const prefs = usable
+    .filter((p) => appliesTo(p, occasion))
     .map((p) => ({
       id: p.id,
       [p.polarity]: p.subject,
@@ -341,13 +356,21 @@ export function profileForAI(profile, { occasion } = {}) {
       ...(h.restaurant.name ? { at: h.restaurant.name } : {}),
       feedback: h.feedback.map((t) => FEEDBACK[t].label),
       ...(h.note ? { note: h.note } : {}),
+      // Ordered to answer a craving: the AI should not read it as lasting taste.
+      ...(h.context?.matched?.length ? { orderedWhileCraving: h.context.matched } : {}),
+      ...(h.occasion ? { occasion: h.occasion } : {}),
     }));
+
+  const occasionDependent = occasion ? [] : usable
+    .filter((p) => p.contexts.length)
+    .map((p) => ({ [p.polarity]: p.subject, onlyFor: p.contexts }));
 
   return {
     about: profile.about.notes || undefined,
     homeCity: profile.settings.homeCity || undefined,
     guidance: profile.guidance.length ? profile.guidance : undefined,
     preferences: prefs,
+    ...(occasionDependent.length ? { occasionDependent } : {}),
     restrictions,
     restrictionsWithheld: !profile.settings.shareRestrictionsWithAI && profile.restrictions.length > 0,
     recentOrders: recent,

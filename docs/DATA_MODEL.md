@@ -100,7 +100,15 @@ Dish {
 Pick { dishId, role, whyYou, evidence [{type, ref, text}], concerns[], occasionFit }
 ```
 
-Every personal claim must point to a preference, restriction, past order, menu fact or occasion. If the model returns a `dishId` that does not exist, it is dropped.
+Every personal claim must point to a preference, restriction, past order, menu fact or occasion.
+
+**After generation, a deterministic guard (`shared/guard.js`) checks every result**, from the AI or the local matcher. It runs on the server, and again in the browser with the full profile, so restrictions kept private from the AI are enforced too:
+
+- A pick the restriction screen flags for a **strict** restriction is removed and listed in cautions. The results screen says which dishes were left out and why. A `dishId` that isn't on the menu is removed.
+- Evidence citing a preference or restriction must use an id that was actually submitted; `menu` evidence must name something the dish really has. Anything else is dropped. If no preference or history evidence survives, sentences claiming the diner's taste ("you love…") are removed too.
+- Sentences stating a price the menu doesn't show, or a dietary assurance the menu doesn't print ("gluten-free", "vegan", "safe for…", also in German and Chinese), are removed.
+
+Occasion-specific preferences (`contexts`) follow one rule in both layers (`appliesTo`): they count only when the occasion is known and matches. With no occasion they are sent to the AI separately as `occasionDependent`, only to decide whether to ask about the occasion, and can't be cited.
 
 ## Main user flows
 
@@ -135,3 +143,48 @@ Every personal claim must point to a preference, restriction, past order, menu f
 - Add `GET/PUT/DELETE /api/profile` in `server.js`, keyed by `ownerId`. Validate with `normalizeProfile`, which already handles migration.
 - For a relational store, `preferences`, `restrictions`, `history` and their `evidence`/`history` arrays map directly to tables. `evidence.ref → history.id` becomes a foreign key.
 - On first sign-in, upload the local profile and set `ownerId`.
+
+## Session context ("Refine my picks")
+
+`shared/session.js` reads what the diner says about *this meal* ("I've already
+eaten", "something starchy", "actually, no fish today") into:
+
+```
+{ hunger: 'ate'|'light'|'hungry'|null, sharing: 'partner'|'group'|'solo'|null,
+  novelty: 'adventurous'|'familiar'|null, cravings: [key], avoid: [key], log: [{text, kind, changes, unparsed}] }
+```
+
+- It lives in `sessionStorage` with the menu, resets when a new menu is read, and is **never written to the profile**.
+- Each statement is classified as `context`, `craving` (incl. a temporary "not today"), `correction` (overrides an earlier statement; the latest wins) or `durable`. Durable statements ("I never eat coriander") apply to this meal and are *offered* as a profile update the diner can tap; nothing is saved without that tap.
+- Food groups (starchy, protein, vegetables, fish, seafood, meat…) match on words and dish attributes; a specific food ("noodles") is matched as itself, so "no noodles" does not rule out rice.
+- The menu is reused; refining never re-extracts it.
+- Both recommenders use it. Locally, a craving outweighs stored taste for today, and "not today" sets a dish aside even when the profile says the diner usually likes it (the headline says the profile is unchanged). The AI gets `<session>` and the previous picks and may write a `changeNote`; afterwards `enforceSession()` sets aside any pick that matches "not today", and the guard drops `session` evidence when nothing was said.
+- `explainChange()` builds the "In / Out / moved to the top" lines deterministically from the two shortlists. Statements the matcher couldn't read are shown to the diner rather than guessed at.
+
+## Combinations and meal goals
+
+Recommendations carry `combos: [{ title, dishIds, why }]`, ways to put an order together (`shared/combos.js` locally, or the AI):
+
+- **Your plate + a bite of theirs:** the diner can share a partner's food, so a vegetable dish plus a shareable dish labelled meat or seafood.
+- **A few plates for the table:** sharing, so three or four shareable small plates.
+- **Main + a small side:** the default, except when the diner isn't very hungry or the table is sharing.
+- **Just something sweet / One small plate:** already eaten.
+- **Save room for dessert:** a sweet craving.
+
+Dish roles come from the menu's own section names first ("Beilagen", "Mezedes", "Desserts") and from attributes only when there is no section. Drinks are never part of a combination.
+
+The guard drops any combination that contains a dish it removed or an unknown dish, and `enforceSession()` drops any that contains a "not today" dish.
+
+General taste (profile), the current craving, hunger, sharing and familiar-vs-adventurous are separate inputs. Nothing optimises calories or protein unless the diner asks; "more protein" is a craving like any other.
+
+The browser's whole pick path (AI → fallback → guard → session) is `shared/pipeline.js` (`choosePicks`), so the behavioural scenarios in `test/scenarios.test.js` exercise exactly what the diner sees.
+
+## Feedback: lasting taste vs. the moment
+
+- Ordering a dish stores the meal's **context** on the history entry (`makeOrderContext`): hunger, sharing, novelty, cravings, "not today", and `matched` (the cravings this dish answered), all as plain words. Entries made before this have `context: null`. The journal shows it ("While: craving something starchy").
+- **Craving discount:** "I loved this" / "It was good" on a dish that answered a craving spread **half** their usual weight to its ingredients and style. The evidence note says so ("ordered while craving something starchy; counts half"). "I'd order it again" is about the dish itself and is not discounted.
+- **"Right for the moment"** (`right_for_moment`) says the choice suited the occasion, not that its ingredients are liked:
+  - it creates or strengthens a **dish-level** like scoped to the entry's occasion (`contexts: [occasion]`), with no ingredient or style spread;
+  - with no occasion, it counts half and stays unscoped.
+- The AI's `recentOrders` carry `orderedWhileCraving` and `occasion`, so it does not read a craving as lasting taste.
+- Everything stays reversible and inspectable: each piece of evidence carries its history id and a note. Changing the feedback replaces it, and deleting the entry withdraws it. Inferred preferences remain suggestions until confirmed and can be dismissed.

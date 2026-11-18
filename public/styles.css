@@ -738,6 +738,38 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
   :root:not([data-theme="light"]) .chip.on { color: #171412; }
 }
 
+/* Refine my picks: a sticker-edged panel between the headline and the picks. */
+.refine { margin: 0 0 1.25rem; padding: .9rem 1rem 1rem; border: var(--outline) solid var(--ink); border-radius: 20px; background: var(--paper); box-shadow: 0 3px 0 var(--ink); }
+.refine-label { display: block; font-family: var(--heading); font-size: 1.05rem; margin-bottom: .4rem; }
+.refine-row { display: flex; gap: .5rem; align-items: center; }
+.refine-row input { flex: 1; min-width: 0; }
+.refine-examples { margin-top: .6rem; }
+.refine-examples .chip { white-space: nowrap; }
+.refine-active { margin-top: .9rem; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.refine-active .eyebrow { width: 100%; margin: 0; }
+.refine-active .chips { flex: 1 1 100%; }
+.refine .chip { font-size: .82rem; padding: .4rem .8rem; }
+.refine-active .chip .x { font-family: var(--sans); margin-left: .2rem; }
+.refine-change { margin-top: .8rem; padding-top: .7rem; border-top: 2px dashed var(--ink); }
+.change-lines { list-style: none; margin: 0 0 .4rem; padding: 0; font-size: .92rem; }
+.change-lines li { padding: .15rem 0 .15rem 1.4rem; position: relative; }
+.change-lines li::before { position: absolute; left: 0; font-family: var(--mono); font-weight: 700; }
+.change-lines .change-in::before { content: "+"; color: var(--green); }
+.change-lines .change-out::before { content: "−"; color: var(--paprika); }
+.change-lines .change-up::before { content: "↑"; }
+.change-lines .change-same::before { content: "="; }
+.save-suggest button { margin-left: .25rem; }
+
+/* Combinations: a row of small sticker cards under the picks. */
+.combos { margin: 1.25rem 0; }
+.combos-title { font-family: var(--heading); font-size: 1.15rem; margin: 0 0 .6rem; }
+.combo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; }
+.combo { border: var(--outline) solid var(--ink); border-radius: 18px; padding: .75rem 1rem; background: var(--paper); }
+.combo:nth-child(3n+1) { background: color-mix(in srgb, var(--yolk) 22%, var(--paper)); }
+.combo-name { font-family: var(--mono); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 .25rem; }
+.combo-dishes { font-weight: 700; margin: 0 0 .25rem; }
+.combo-dishes .plus { color: var(--paprika); }
+
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
   body { font-size: 1.0625rem; padding-bottom: 0; }
