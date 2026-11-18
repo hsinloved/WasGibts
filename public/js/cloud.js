@@ -162,3 +162,31 @@ export async function sharedRestrictions(householdId) {
   fail(error);
   return data ?? [];
 }
+
+// --- Recipes ---------------------------------------------------------------------------
+
+const RECIPE_FIELDS = ['servings', 'activeMinutes', 'ingredients', 'steps', 'keepsDays', 'storage', 'reheat', 'allergens', 'tags', 'whyItBoxesWell', 'flags', 'shortKeep'];
+
+export async function saveRecipe(householdId, idea) {
+  const sb = await client();
+  const data = Object.fromEntries(RECIPE_FIELDS.filter((k) => idea[k] !== undefined).map((k) => [k, idea[k]]));
+  const { data: row, error } = await sb.from('recipes').insert({
+    household_id: householdId, cuisine: String(idea.cuisine).slice(0, 40), title: String(idea.title).slice(0, 120),
+    title_original: idea.titleOriginal ? String(idea.titleOriginal).slice(0, 120) : null, summary: String(idea.summary ?? '').slice(0, 600), data, source: 'ai',
+  }).select('id').single();
+  fail(error);
+  return row.id;
+}
+
+export async function listRecipes(householdId) {
+  const sb = await client();
+  const { data, error } = await sb.from('recipes').select('id, cuisine, title, title_original, summary, data, created_at').eq('household_id', householdId).order('created_at', { ascending: false }).limit(200);
+  fail(error);
+  return (data ?? []).map((r) => ({ id: r.id, cuisine: r.cuisine, title: r.title, titleOriginal: r.title_original, summary: r.summary, createdAt: r.created_at, ...r.data }));
+}
+
+export async function deleteRecipe(id) {
+  const sb = await client();
+  const { error } = await sb.from('recipes').delete().eq('id', id);
+  fail(error);
+}

@@ -777,6 +777,10 @@ details.pref-more[open] > summary.pref-main::after { color: var(--accent); }
 .invite-code { font-family: var(--mono); font-size: 1.8rem; letter-spacing: .18em; margin: .25rem 0; color: var(--ink); }
 .account-line { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: 1.5rem; }
 
+.recipe-list { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: .9rem; }
+.recipe { border: 2px solid var(--ink); border-radius: 16px; padding: .8rem 1rem; background: var(--paper); }
+.recipe .keeps { margin: .35rem 0; }
+
 /* --- Wider screens ------------------------------------------------------------- */
 @media (min-width: 40rem) {
   body { font-size: 1.0625rem; padding-bottom: 0; }
